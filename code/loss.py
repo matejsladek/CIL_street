@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import *
 import tensorflow_addons as tfa
-
+from tensorflow.keras import backend as K
 
 def dice_coef(y_true, y_pred, smooth = 1):
     y_true_f = tf.keras.backend.flatten(y_true)
@@ -35,3 +35,25 @@ def surface_loss(y_true, y_pred):
                                      Tout=tf.float32)
     multipled = y_pred * y_true_dist_map
     return tf.keras.backend.mean(multipled)
+
+
+def focal_loss(gamma=2., alpha=.25):
+    def binary_focal_loss_fixed(y_true, y_pred):
+        pt_1 = tf.where(tf.equal(y_true, 1), y_pred, tf.ones_like(y_pred))
+        pt_0 = tf.where(tf.equal(y_true, 0), y_pred, tf.zeros_like(y_pred))
+        epsilon = K.epsilon()
+        # clip to prevent NaN's and Inf's
+        pt_1 = K.clip(pt_1, epsilon, 1. - epsilon)
+        pt_0 = K.clip(pt_0, epsilon, 1. - epsilon)
+        return -K.mean(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1)) \
+               -K.mean((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
+    return binary_focal_loss_fixed
+
+
+def compound_loss(alpha=0.7):
+    def fixed_compound_loss(y_true, y_pred):
+        epsilon = K.epsilon()
+        bce = y_true * tf.math.log(K.clip(y_pred, epsilon, 1. - epsilon))
+        bce += (1 - y_true) * tf.math.log(1 - K.clip(y_pred, epsilon, 1. - epsilon))
+        return alpha * bce + (1-alpha) * soft_dice_loss(y_true, y_pred)
+    return fixed_compound_loss
