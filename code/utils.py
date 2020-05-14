@@ -35,7 +35,7 @@ def show_predictions(model=None, dataset=None, num=1):
 
 def save_predictions(model):
 
-  test_path = "road_segmentation/test_images/test_images"
+  test_path = "road_segmentation/data/test_images"
   test_list = os.listdir(test_path)
   test_list.sort()
 
@@ -46,4 +46,19 @@ def save_predictions(model):
     image = np.expand_dims(image, 0)
     output = (model.predict(image) * 255).astype(np.uint8)
     output_img = tf.keras.preprocessing.image.array_to_img(output[0]).resize((608, 608))
-    output_img.save(os.path.join('road_segmentation/test_images/output', image_path))
+    output_img.save(os.path.join('road_segmentation/data/output', image_path))
+
+
+def plot_loss(model_history):
+    loss = model_history.history['loss']
+    val_loss = model_history.history['val_loss']
+    epochs = range(len(loss))
+    plt.figure()
+    plt.plot(epochs, loss, 'r', label='Training loss')
+    plt.plot(epochs, val_loss, 'bo', label='Validation loss')
+    plt.title('Training and Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss Value')
+    plt.ylim([np.min(val_loss + loss) - 0.1, np.max(val_loss + loss) + 0.1])
+    plt.legend()
+    plt.show()
