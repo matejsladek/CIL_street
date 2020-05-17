@@ -55,11 +55,7 @@
 
 
 # LOSSES
-- cross entropy {Marco}
-- multinomial logistic loss {Marco}
-- infogain loss {Marco}
-- [focal loss](https://towardsdatascience.com/neural-networks-intuitions-3-focal-loss-for-dense-object-detection-paper-explanation-61bc0205114e) {Marco}
-- compound loss
+- Compound loss
 - Sobel operator to compute and penalize edges length
 - loss penalizing road area
 - something with hough transform
@@ -67,11 +63,13 @@
 - ~~surface loss~~ after 500 epochs gets 0.860
 - ~~soft dice loss~~ after 300 epochs gets 0.854
 - ~~code loss on their metric~~ actually not differentiable
+- ~~cross entropy {Marco}~~
+- [~~focal loss~~](https://towardsdatascience.com/neural-networks-intuitions-3-focal-loss-for-dense-object-detection-paper-explanation-61bc0205114e) {Marco}
 
     
 # METRICS
-- F1 score {Marco}
-- Metric used on kaggle to get consistent validation scores {Marco}
+- ~~F1 score {Marco}~~
+- ~~Metric used on kaggle to get consistent validation scores {Marco}~~
 
 
 # DATA AUGMENTATION
@@ -98,13 +96,21 @@
 - secondary NN
 
 
-
 # NOTEBOOKS
 - [Initial colab by Han](https://colab.research.google.com/drive/14Cs7Bs1DXQCTGUOj-cViJiKC47O_E2cA)
 - [U-net with tf.data](https://drive.google.com/open?id=1EgznF_kmUdJmsT0qDfY2tKxLHOZrsMdi)
+- [Simplified U-Net](https://drive.google.com/open?id=11Tx38SgUgQSCccHkl6tC7K13YFN7fd1b)
 
 
 # COMMENTS
 - test data has lots of parkings
-- total entropy is not a good measure for the qualityof the output
+- total entropy is not a good measure for the quality of the output (similar values for ground truth and bad output)
 - can get around 80% accuracy by predicting always black
+
+
+# TODO
+- Marco: metrics and most losses are coded, now I will try to implement some of the models listed under architecture
+- Marco: allow for loading pretrained weights
+- ???: work on data augmentation and mining
+- ???: work on post-processing
+- ???: once essential architectures and losses are implemented, we need to fine tune the best performing ones
