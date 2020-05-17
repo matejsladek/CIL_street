@@ -35,7 +35,7 @@ def show_predictions(model=None, dataset=None, num=1):
 
 def save_predictions(model):
 
-  test_path = "road_segmentation/data/test_images"
+  test_path = "CIL_street/data/test_images"
   test_list = os.listdir(test_path)
   test_list.sort()
 
@@ -46,7 +46,7 @@ def save_predictions(model):
     image = np.expand_dims(image, 0)
     output = (model.predict(image) * 255).astype(np.uint8)
     output_img = tf.keras.preprocessing.image.array_to_img(output[0]).resize((608, 608))
-    output_img.save(os.path.join('road_segmentation/data/output', image_path))
+    output_img.save(os.path.join('CIL_street/data/output', image_path))
 
 
 def plot_loss(model_history):
