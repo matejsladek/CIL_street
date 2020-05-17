@@ -2,17 +2,20 @@ import tensorflow as tf
 from tensorflow.keras import backend as K
 import numpy as np
 
+
 def recall_m(y_true, y_pred):
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
     possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
     recall = true_positives / (possible_positives + K.epsilon())
     return recall
 
+
 def precision_m(y_true, y_pred):
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
     predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
     precision = true_positives / (predicted_positives + K.epsilon())
     return precision
+
 
 def f1_m(y_true, y_pred):
     precision = precision_m(y_true, y_pred)
@@ -24,7 +27,9 @@ def patch_to_label(patch):
     df = np.mean(patch, axis = (1, 2))
     return np.where(df > 0.25, 1, 0)
 
-def np_kaggle_metric(y_true, y_pred):
+
+def np_kaggle_metric_old(y_true, y_pred):
+    # kept as a reference
     patch_size = 16
     correct = 0
     patch_count = 0
@@ -39,5 +44,15 @@ def np_kaggle_metric(y_true, y_pred):
 
     return np.array(correct/(patch_count)).astype(np.float32)
 
+
+def np_kaggle_metric(y_true, y_pred):
+    patch_size = 16
+    y_true = y_true.reshape(y_true.shape[0], int(y_true.shape[1]/patch_size), patch_size, int(y_true.shape[2]/patch_size), patch_size)
+    y_pred = y_pred.reshape(y_true.shape[0], int(y_pred.shape[1]/patch_size), patch_size, int(y_pred.shape[2]/patch_size), patch_size)
+    y_true = np.where(np.sum(y_true, axis=(2, 4))/(patch_size**2) > 0.25, 1, 0)
+    y_pred = np.where(np.sum(y_pred, axis=(2, 4))/(patch_size**2) > 0.25, 1, 0)
+    return np.array(np.sum(y_true == y_pred)/np.sum(np.ones_like(y_true))).astype(np.float32)
+
+
 def kaggle_metric(y_true, y_pred):
-  return tf.numpy_function(np_kaggle_metric, [y_true, y_pred], tf.float32)
+    return tf.numpy_function(np_kaggle_metric, [y_true, y_pred], tf.float32)
