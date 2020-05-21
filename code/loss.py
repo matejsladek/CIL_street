@@ -3,6 +3,8 @@ import tensorflow as tf
 from tensorflow.keras.layers import *
 import tensorflow_addons as tfa
 from tensorflow.keras import backend as K
+from scipy.ndimage import distance_transform_edt as distance
+
 
 def dice_coef(y_true, y_pred, smooth = 1):
     y_true_f = tf.keras.backend.flatten(y_true)
@@ -14,7 +16,6 @@ def dice_coef(y_true, y_pred, smooth = 1):
 def soft_dice_loss(y_true, y_pred):
     return 1-dice_coef(y_true, y_pred)
 
-from scipy.ndimage import distance_transform_edt as distance
 
 def calc_dist_map(seg):
     res = np.zeros_like(seg)
@@ -24,10 +25,12 @@ def calc_dist_map(seg):
         res = distance(negmask) * negmask - (distance(posmask) - 1) * posmask
     return res
 
+
 def calc_dist_map_batch(y_true):
     y_true_numpy = y_true.numpy()
     return np.array([calc_dist_map(y)
                      for y in y_true_numpy]).astype(np.float32)
+
 
 def surface_loss(y_true, y_pred):
     y_true_dist_map = tf.py_function(func=calc_dist_map_batch,
@@ -57,3 +60,17 @@ def compound_loss(alpha=0.7):
         bce += (1 - y_true) * tf.math.log(1 - K.clip(y_pred, epsilon, 1. - epsilon))
         return alpha * bce + (1-alpha) * soft_dice_loss(y_true, y_pred)
     return fixed_compound_loss
+
+
+def bce_dice_loss(y_true, y_pred):
+    epsilon = K.epsilon()
+    bce = y_true * tf.math.log(K.clip(y_pred, epsilon, 1. - epsilon))
+    bce += (1 - y_true) * tf.math.log(1 - K.clip(y_pred, epsilon, 1. - epsilon))
+    return bce + soft_dice_loss(y_true, y_pred)
+
+
+def bce_logdice_loss(y_true, y_pred):
+    epsilon = K.epsilon()
+    bce = y_true * tf.math.log(K.clip(y_pred, epsilon, 1. - epsilon))
+    bce += (1 - y_true) * tf.math.log(1 - K.clip(y_pred, epsilon, 1. - epsilon))
+    return bce - tf.keras.backend.log(1. - soft_dice_loss(y_true, y_pred))

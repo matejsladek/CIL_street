@@ -45,13 +45,14 @@
     - need to tune it (hyperparameters and architecture)
     - can use pretrained network
     - decide between patch-wise and global prediction
-- Dilated UNet
+- ~~Dilated UNet~~
 - [PixtoPix](https://phillipi.github.io/pix2pix/)
-- [DeepLab](https://github.com/tensorflow/models/tree/master/research/deeplab)
-- [GSCNN](https://nv-tlabs.github.io/GSCNN/)
+- [DeepLab](https://github.com/bonlime/keras-deeplab-v3-plus)
+- [GSCNN](https://github.com/ben-davidson-6/Gated-SCNN/blob/master/gscnn/model/model_definition.py)
 - [FastFCN](https://github.com/wuhuikai/FastFCN)
 - [U-Net++](https://github.com/MrGiovanni/UNetPlusPlus)
 - we can try [neural architecture search](https://arxiv.org/pdf/2003.11883v1.pdf)
+- MTL architecture using Sobel edge detection
 
 
 # LOSSES
@@ -60,6 +61,7 @@
 - loss penalizing road area
 - something with hough transform
 - [other losses](https://medium.com/@junma11/loss-functions-for-medical-image-segmentation-a-taxonomy-cefa5292eec0)
+- [loss from RSRCNN](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7876793)
 - ~~surface loss~~ after 500 epochs gets 0.860
 - ~~soft dice loss~~ after 300 epochs gets 0.854
 - ~~code loss on their metric~~ actually not differentiable
