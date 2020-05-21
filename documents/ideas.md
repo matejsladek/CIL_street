@@ -56,19 +56,21 @@
 
 
 # LOSSES
-- Compound loss
-- Sobel operator to compute and penalize edges length
-- loss penalizing road area
-- something with hough transform
-- [other losses](https://medium.com/@junma11/loss-functions-for-medical-image-segmentation-a-taxonomy-cefa5292eec0)
-- [loss from RSRCNN](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7876793)
+
+- [~~other losses~~](https://medium.com/@junma11/loss-functions-for-medical-image-segmentation-a-taxonomy-cefa5292eec0)
+- [~~loss from RSRCNN~~](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7876793)
+- ~~Compound loss~~
 - ~~surface loss~~ after 500 epochs gets 0.860
 - ~~soft dice loss~~ after 300 epochs gets 0.854
 - ~~code loss on their metric~~ actually not differentiable
 - ~~cross entropy {Marco}~~
 - [~~focal loss~~](https://towardsdatascience.com/neural-networks-intuitions-3-focal-loss-for-dense-object-detection-paper-explanation-61bc0205114e) {Marco}
+- probably bad ideas:
+    - Sobel operator to compute and penalize edges length
+    - loss penalizing road area
+    - something with hough transform
 
-    
+
 # METRICS
 - ~~F1 score {Marco}~~
 - ~~Metric used on kaggle to get consistent validation scores {Marco}~~
@@ -102,17 +104,16 @@
 - [Initial colab by Han](https://colab.research.google.com/drive/14Cs7Bs1DXQCTGUOj-cViJiKC47O_E2cA)
 - [U-net with tf.data](https://drive.google.com/open?id=1EgznF_kmUdJmsT0qDfY2tKxLHOZrsMdi)
 - [Simplified U-Net](https://drive.google.com/open?id=11Tx38SgUgQSCccHkl6tC7K13YFN7fd1b)
+- [Try using pretrained backbones](https://colab.research.google.com/drive/1IruU8ALJoiqHP1FqDNqtt2EpxD8Vwgpe?usp=sharing)
 
 
 # COMMENTS
 - test data has lots of parkings
 - total entropy is not a good measure for the quality of the output (similar values for ground truth and bad output)
 - can get around 80% accuracy by predicting always black
-
+- it is very hard to adapt pretrained networks. Bigger unets (resnet50 backbone) are also significantly less stable.
 
 # TODO
-- Marco: metrics and most losses are coded, now I will try to implement some of the models listed under architecture
-- Marco: allow for loading pretrained weights
 - ???: work on data augmentation and mining
 - ???: work on post-processing
 - ???: once essential architectures and losses are implemented, we need to fine tune the best performing ones
