@@ -39,7 +39,7 @@ def distance_map_loss(y_true, y_pred):
             negmask = ~(y_true.astype(np.bool))
             res = np.stack([distance(batch) for batch in negmask])
             max_dist = np.apply_over_axes(np.max, res, [1, 2])
-            T = 0.3 * max_dist
+            T = 0.05 * max_dist
             return np.where(res > T, T / max_dist, res / max_dist)
         dc = tf.py_function(func=calc_dist_coeff, inp=[y_true], Tout=tf.float32)
         return tf.math.exp(-dc)
@@ -47,7 +47,7 @@ def distance_map_loss(y_true, y_pred):
     epsilon = K.epsilon()
     bce = y_true * tf.math.log(K.clip(y_pred, epsilon, 1. - epsilon))
     bce += dist_coeff(y_true) * (1 - y_true) * tf.math.log(1 - K.clip(y_pred, epsilon, 1. - epsilon))
-    return -bce
+    return -K.mean(bce)
 
 
 def focal_loss(gamma=2., alpha=.25):
@@ -80,9 +80,9 @@ def bce_logdice_loss(y_true, y_pred):
     bce = -bce
     return K.mean(bce - tf.keras.backend.log(1. - soft_dice_loss(y_true, y_pred)))
 
-
 def bce_surface_loss(y_true, y_pred):
     epsilon = K.epsilon()
     bce = y_true * tf.math.log(K.clip(y_pred, epsilon, 1. - epsilon))
     bce += (1 - y_true) * tf.math.log(1 - K.clip(y_pred, epsilon, 1. - epsilon))
     return K.mean(-bce + surface_loss(y_true, y_pred))
+
