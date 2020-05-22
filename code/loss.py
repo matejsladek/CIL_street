@@ -85,4 +85,3 @@ def bce_surface_loss(y_true, y_pred):
     bce = y_true * tf.math.log(K.clip(y_pred, epsilon, 1. - epsilon))
     bce += (1 - y_true) * tf.math.log(1 - K.clip(y_pred, epsilon, 1. - epsilon))
     return K.mean(-bce + surface_loss(y_true, y_pred))
-

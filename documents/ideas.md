@@ -76,7 +76,8 @@
 - ~~Metric used on kaggle to get consistent validation scores {Marco}~~
 
 
-# DATA AUGMENTATION
+# PREPROCESSING
+- standardization
 - horizontal/vertical/diagonal flips, rotations
 - random contrast/brightness/HSV
 - Gaussian Blur
