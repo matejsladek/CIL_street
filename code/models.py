@@ -1,8 +1,8 @@
-  # taken from a blog post
-  # -- Keras Functional API -- #
-  # -- UNet Implementation -- #
-  # Everything here is from tensorflow.keras.layers
-  # I imported tensorflow.keras.layers * to make it easier to read
+# taken from a blog post
+# -- Keras Functional API -- #
+# -- UNet Implementation -- #
+# Everything here is from tensorflow.keras.layers
+# I imported tensorflow.keras.layers * to make it easier to read
 
 import tensorflow as tf
 from tensorflow.keras.layers import *
@@ -87,7 +87,7 @@ def UNet():
     return tf.keras.Model(inputs=inputs, outputs=conv10)
 
 
-#implementation with channel count from original paper
+# implementation with channel count from original paper
 def Biomedical_UNet():
     input_size = (400, 400, 3)
 
@@ -164,15 +164,15 @@ def Biomedical_UNet():
 
 
 # flexible implementation
-def CustomUNet(blocks=3, filters=32, activation='relu', dropout=0.2, bn=True, dilation=True, depth=6, aspp=True, aggregate='add', upsample=False):
-
+def CustomUNet(blocks=3, conv_per_block=2, filters=32, activation='relu', dropout=0.2, bn=True, dilation=False, depth=6,
+               aspp=False, aggregate='add', upsample=False):
     input_size = (400, 400, 3)
     inputs = Input(input_size)
     x = inputs
     skip = []
     for i in range(blocks):
-        for j in range(2):
-            x = Conv2D(filters, 3, activation, padding='same', kernel_initializer='he_normal')(x)
+        for j in range(conv_per_block):
+            x = Conv2D(filters, 3, activation=activation, padding='same', kernel_initializer='he_normal')(x)
             if bn:
                 x = BatchNormalization()(x)
             x = Dropout(dropout)(x)
@@ -185,14 +185,16 @@ def CustomUNet(blocks=3, filters=32, activation='relu', dropout=0.2, bn=True, di
         last_layer = None
         for i in range(depth):
             if aspp:
-                y = Conv2D(filters, 3, activation, dilation_rate=2**i, padding='same', kernel_initializer='he_normal')(x)
+                y = Conv2D(filters, 3, activation=activation, dilation_rate=2 ** i, padding='same',
+                           kernel_initializer='he_normal')(x)
                 if bn:
                     y = BatchNormalization()(y)
                 y = Dropout(dropout)(y)
                 dilated.append(y)
                 last_layer = y
             else:
-                x = Conv2D(filters, 3, activation, dilation_rate=2 ** i, padding='same', kernel_initializer='he_normal')(x)
+                x = Conv2D(filters, 3, activation=activation, dilation_rate=2 ** i, padding='same',
+                           kernel_initializer='he_normal')(x)
                 if bn:
                     x = BatchNormalization()(x)
                 x = Dropout(dropout)(x)
@@ -202,29 +204,31 @@ def CustomUNet(blocks=3, filters=32, activation='relu', dropout=0.2, bn=True, di
             x = tf.keras.layers.add(dilated)
         elif aggregate == 'concat':
             x = tf.keras.layers.concatenate(dilated)  # check axis
-            x = Conv2D(filters, 1, activation, padding='same', kernel_initializer='he_normal')(x)
+            x = Conv2D(filters, 1, activation=activation, padding='same', kernel_initializer='he_normal')(x)
         else:
             x = last_layer
 
-        for i in range(blocks):
-            filters = int(filters / 2)
-            if upsample:
-                x = UpSampling2D()(x)
-            else:
-                x = Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same')(x)
-            x = concatenate([x, skip[-i]])
-            for j in range(2):
-                x = Conv2D(filters, 3, activation, padding='same', kernel_initializer='he_normal')(x)
-                if bn:
-                    x = BatchNormalization()(x)
-                x = Dropout(dropout)(x)
+    for i in range(blocks):
+        filters = int(filters / 2)
+        if upsample:
+            x = UpSampling2D()(x)
+        else:
+            x = Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same')(x)
+        x = concatenate([x, skip[-(1 + i)]])
+        for j in range(conv_per_block):
+            x = Conv2D(filters, 3, activation=activation, padding='same', kernel_initializer='he_normal')(x)
+            if bn:
+                x = BatchNormalization()(x)
+            x = Dropout(dropout)(x)
 
-        x = Conv2D(1, 1, activation='sigmoid')(x)
-        return tf.keras.Model(inputs=inputs, outputs=x)
+    x = Conv2D(1, 1, activation='sigmoid')(x)
+    return tf.keras.Model(inputs=inputs, outputs=x)
 
 
-from tensorflow.keras.applications.resnet50 import ResNet50,preprocess_input
+from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input
 from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
+
+
 # TODO: fix need for rescaling
 # TODO: test
 # TODO: check input preprocessing
@@ -261,11 +265,13 @@ def PretrainedUnet(freeze_encoder=True, backbone='resnet50', activation='relu', 
         else:
             prev_conv = UpSampling2D()(prev_conv)
             concat_layer = concatenate([layer.output, prev_conv])
-        prev_conv = Conv2D(n_channels, 3, activation=activation, padding='same', kernel_initializer='he_normal')(concat_layer)
+        prev_conv = Conv2D(n_channels, 3, activation=activation, padding='same', kernel_initializer='he_normal')(
+            concat_layer)
         if b_n:
             prev_conv = BatchNormalization()(prev_conv)
         prev_conv = Dropout(dropout)(prev_conv)
-        prev_conv = Conv2D(n_channels, 3, activation=activation, padding='same', kernel_initializer='he_normal')(prev_conv)
+        prev_conv = Conv2D(n_channels, 3, activation=activation, padding='same', kernel_initializer='he_normal')(
+            prev_conv)
         if b_n:
             prev_conv = BatchNormalization()(prev_conv)
 
