@@ -86,6 +86,7 @@
 - [Toronto City Dataset](http://www.cs.toronto.edu/~wenjie/papers/iccv17/wang_etal_iccv17.pdf)
 - [Massachussets Road Dataset](https://www.cs.toronto.edu/~vmnih/data/)
 - [SpaceNet Road (use Atlanta)](https://spacenetchallenge.github.io/datasets/spacenetRoads-summary.html)
+- [2D Semantic Labeling Contest (Postdam, Vaihingen)](http://www2.isprs.org/commissions/comm3/wg4/2d-sem-label-potsdam.html)
 
 
 # POST PROCESSING
