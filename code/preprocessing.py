@@ -1,8 +1,8 @@
 import tensorflow as tf
 import numpy as np
 
-def parse_image(img_path: str) -> dict:
 
+def parse_image(img_path: str) -> dict:
     image = tf.io.read_file(img_path)
     image = tf.image.decode_png(image, channels=3)
     image = tf.image.convert_image_dtype(image, tf.uint8)
@@ -10,42 +10,64 @@ def parse_image(img_path: str) -> dict:
     mask_path = tf.strings.regex_replace(img_path, "images", "groundtruth")
     mask = tf.io.read_file(mask_path)
     mask = tf.image.decode_png(mask, channels=1)
-    mask = tf.where(mask > 0, np.dtype('uint8').type(1), mask)
+    # mask = tf.where(mask > 0, np.dtype('uint8').type(1), mask)
 
-    return {'image': image, 'segmentation_mask': mask}
+    return {'image': image, 'mask': mask}
 
-@tf.function
-def normalize(input_image: tf.Tensor, input_mask: tf.Tensor) -> tuple:
-    """Rescale the pixel values of the images between 0.0 and 1.0
-    compared to [0,255] originally.
-    """
-    input_image = tf.cast(input_image, tf.float32) / 255.0
-    return input_image, input_mask
 
-@tf.function
-def load_image_train(datapoint: dict) -> tuple:
-    """Apply some transformations to an input dictionary
-    containing a train image and its annotation.
-    """
+def get_load_image_train(size=400, normalize=True, h_flip=0.5, v_flip=0.5, rot=0.25, contrast=0, brightness=0):
+    @tf.function
+    def load_image_train(datapoint: dict) -> tuple:
 
-    input_image = tf.image.resize(datapoint['image'], (400, 400))
-    input_mask = tf.image.resize(datapoint['segmentation_mask'], (400, 400))
+        input_image = tf.image.resize(datapoint['image'], (size, size))
+        input_mask = tf.image.resize(datapoint['mask'], (size, size))
 
-    if tf.random.uniform(()) > 0.5:
-        input_image = tf.image.flip_left_right(input_image)
-        input_mask = tf.image.flip_left_right(input_mask)
+        if tf.random.uniform(()) < h_flip:
+            input_image = tf.image.flip_left_right(input_image)
+            input_mask = tf.image.flip_left_right(input_mask)
 
-    input_image, input_mask = normalize(input_image, input_mask)
+        if tf.random.uniform(()) < v_flip:
+            input_image = tf.image.flip_left_right(input_image)
+            input_mask = tf.image.flip_left_right(input_mask)
 
-    return input_image, input_mask
+        if tf.random.uniform(()) < rot:
+            input_image = tf.image.rot90(input_image, 1)
+            input_mask = tf.image.rot90(input_mask, 1)
+        elif tf.random.uniform(()) < rot * 2:
+            input_image = tf.image.rot90(input_image, 2)
+            input_mask = tf.image.rot90(input_mask, 2)
+        elif tf.random.uniform(()) < rot * 3:
+            input_image = tf.image.rot90(input_image, 3)
+            input_mask = tf.image.rot90(input_mask, 3)
 
-@tf.function
-def load_image_test(datapoint: dict) -> tuple:
-    """Normalize and resize a test image and its annotation.
-    """
-    input_image = tf.image.resize(datapoint['image'], (400, 400))
-    input_mask = tf.image.resize(datapoint['segmentation_mask'], (400, 400))
+        if tf.random.uniform(()) < contrast:
+            input_image = tf.image.random_contrast(input_image, 0, 0.2)
+        if tf.random.uniform(()) < brightness:
+            input_image = tf.image.random_brightness(input_image, 0.2)
 
-    input_image, input_mask = normalize(input_image, input_mask)
+        if normalize:
+            input_image = tf.cast(input_image, tf.float32) / 255.0
+            input_mask = tf.cast(input_mask, tf.float32) / 255.0
+            # TODO: try other normalizations
 
-    return input_image, input_mask
+        return input_image, input_mask
+
+    return load_image_train
+
+
+def get_load_image_test(size=400, normalize=True):
+    @tf.function
+    def load_image_test(datapoint: dict) -> tuple:
+        """Normalize and resize a test image and its annotation.
+        """
+        input_image = tf.image.resize(datapoint['image'], (size, size))
+        input_mask = tf.image.resize(datapoint['mask'], (size, size))
+
+        if normalize:
+            input_image = tf.cast(input_image, tf.float32) / 255.0
+            input_mask = tf.cast(input_mask, tf.float32) / 255.0
+            # TODO: try other normalizations normalize(input_image, input_mask)
+
+        return input_image, input_mask
+
+    return load_image_test

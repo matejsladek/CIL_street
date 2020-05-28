@@ -234,7 +234,7 @@ def CustomUNet(blocks=4, conv_per_block=2, filters=16, activation='relu', dropou
 import segmentation_models as sm
 
 
-def PretrainedNet(backbone='vgg16', size=224, weights='imagenet', freeze=False)
+def PretrainedNet(backbone='vgg16', size=224, weights='imagenet', freeze=False):
     return sm.Unet(backbone, input_shape=(size, size, 3), encoder_weights=weights, encoder_freeze=freeze)
 
 
@@ -258,5 +258,5 @@ def CustomVGGUnet(size=400):
 
     out = Conv2D(1, (1, 1), activation='sigmoid', kernel_initializer='he_normal', padding='same')(x)
 
-    model = Model(inputs=encoder.input, outputs=out)
+    model = tf.keras.Model(inputs=encoder.input, outputs=out)
     return model

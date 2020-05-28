@@ -26,7 +26,7 @@ def show_predictions(model=None, dataset=None, num=1):
     """Show a sample prediction.
     """
     for image, mask in dataset.take(num):
-        pred_mask = model.predict(np.array(image))
+        pred_mask = model.predict(image)
         #print(pred_mask[0, 0, 0])
         #pred_mask = tf.argmax(pred_mask, axis=-1)
         #pred_mask = tf.expand_dims(pred_mask, axis=-1)
