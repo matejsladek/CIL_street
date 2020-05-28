@@ -52,7 +52,9 @@
 - [FastFCN](https://github.com/wuhuikai/FastFCN)
 - [U-Net++](https://github.com/MrGiovanni/UNetPlusPlus)
 - we can try [neural architecture search](https://arxiv.org/pdf/2003.11883v1.pdf)
-- MTL architecture using Sobel edge detection
+- MTL architecture using Sobel edge detection OR derivatives
+- double network with ce/surface loss + final network ith triple loss function (separate or end to end training)
+- should we resize the test images or split them in 4?
 
 
 # LOSSES
@@ -114,8 +116,3 @@
 - total entropy is not a good measure for the quality of the output (similar values for ground truth and bad output)
 - can get around 80% accuracy by predicting always black
 - it is very hard to adapt pretrained networks. Bigger unets (resnet50 backbone) are also significantly less stable.
-
-# TODO
-- ???: work on data augmentation and mining
-- ???: work on post-processing
-- ???: once essential architectures and losses are implemented, we need to fine tune the best performing ones
