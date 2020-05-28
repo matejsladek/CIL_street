@@ -33,7 +33,7 @@ def show_predictions(model=None, dataset=None, num=1):
         display_sample([image[0], mask[0], pred_mask[0]])
 
 
-def save_predictions(model):
+def save_predictions(model, size=400, normalize=True, crop=False):
 
   test_path = "CIL_street/data/test_images"
   test_list = os.listdir(test_path)
@@ -41,11 +41,18 @@ def save_predictions(model):
 
   for image_path in test_list:
     print(image_path)
-    image = np.array(Image.open(os.path.join(test_path, image_path)).resize((400, 400))) / 255.0
-
+    image = np.array(Image.open(os.path.join(test_path, image_path)).resize((size, size)))
     image = np.expand_dims(image, 0)
-    output = (model.predict(image) * 255).astype(np.uint8)
+    if normalize:
+      image = image/255.0
+
+    output = model.predict(image)
+    if normalize:
+      output = output * 255.0
+
+    output = output.astype(np.uint8)
     output_img = tf.keras.preprocessing.image.array_to_img(output[0]).resize((608, 608))
+    print(output_img)
     output_img.save(os.path.join('CIL_street/data/output', image_path))
 
 
