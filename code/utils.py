@@ -33,7 +33,7 @@ def show_predictions(model=None, dataset=None, num=1):
         display_sample([image[0], mask[0], pred_mask[0]])
 
 
-def save_predictions(model, size=400, normalize=True, crop=False):
+def save_predictions2(model, size=400, normalize=True, crop=True):
 
   test_path = "CIL_street/data/test_images"
   test_list = os.listdir(test_path)
@@ -41,18 +41,38 @@ def save_predictions(model, size=400, normalize=True, crop=False):
 
   for image_path in test_list:
     print(image_path)
-    image = np.array(Image.open(os.path.join(test_path, image_path)).resize((size, size)))
-    image = np.expand_dims(image, 0)
-    if normalize:
-      image = image/255.0
+    if crop:
+        image = np.array(Image.open(os.path.join(test_path, image_path)))
+        img_parts = [image[:400, :400, :], image[:400, -400:, :], image[-400:, :400, :], image[-400:, -400:, :]]
+        out_parts = []
+        for img in img_parts:
+            resized_img = np.array(Image.fromarray(img).resize((size,size)))
+            resized_img = np.expand_dims(resized_img, 0)
+            if normalize:
+                resized_img = resized_img/255.0
+            output = model.predict(resized_img)[0]
+            if normalize:
+                output = output * 255.0
+            out_parts.append(np.array(tf.keras.preprocessing.image.array_to_img(output).resize((400, 400))))
 
-    output = model.predict(image)
-    if normalize:
-      output = output * 255.0
+        output = np.zeros((608, 608))
+        output[:304, :304] = out_parts[0][:304, :304]
+        output[:304, -304:] = out_parts[1][:304, -304:]
+        output[-304:, :304] = out_parts[2][-304:, :304]
+        output[-304:, -304:] = out_parts[3][-304:, -304:]
+        output = np.expand_dims(output, -1)
+    else:
+        image = np.array(Image.open(os.path.join(test_path, image_path)).resize((size, size)))
+        image = np.expand_dims(image, 0)
+        if normalize:
+            image = image/255.0
+        output = model.predict(image)[0]
+        if normalize:
+            output = output * 255.0
 
     output = output.astype(np.uint8)
-    output_img = tf.keras.preprocessing.image.array_to_img(output[0]).resize((608, 608))
-    print(output_img)
+    output_img = tf.keras.preprocessing.image.array_to_img(output).resize((608, 608))
+
     output_img.save(os.path.join('CIL_street/data/output', image_path))
 
 
