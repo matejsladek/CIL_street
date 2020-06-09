@@ -54,7 +54,6 @@
 - we can try [neural architecture search](https://arxiv.org/pdf/2003.11883v1.pdf)
 - MTL architecture using Sobel edge detection OR derivatives
 - double network with ce/surface loss + final network ith triple loss function (separate or end to end training)
-- should we resize the test images or split them in 4?
 
 
 # LOSSES
@@ -109,6 +108,10 @@
 - [U-net with tf.data](https://drive.google.com/open?id=1EgznF_kmUdJmsT0qDfY2tKxLHOZrsMdi)
 - [Simplified U-Net](https://drive.google.com/open?id=11Tx38SgUgQSCccHkl6tC7K13YFN7fd1b)
 - [Try using pretrained backbones](https://colab.research.google.com/drive/1IruU8ALJoiqHP1FqDNqtt2EpxD8Vwgpe?usp=sharing)
+
+- [Best performing notebook](https://colab.research.google.com/drive/11TNtlbcO_8kfSW39JXHiHJcWpIZ3NQWS?usp=sharing)
+- [Multi task learning experiment](https://colab.research.google.com/drive/1cS6_Y5TXMQnVFMGdsNavb1Nh-N_fMowI?usp=sharing)
+
 
 
 # COMMENTS
