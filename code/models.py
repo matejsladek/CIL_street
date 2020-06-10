@@ -231,11 +231,11 @@ def CustomUNet(blocks=4, conv_per_block=2, filters=16, activation='relu', dropou
     return tf.keras.Model(inputs=inputs, outputs=x)
 
 
-#import segmentation_models as sm
+import segmentation_models as sm
 
 
-#def PretrainedNet(backbone='vgg16', size=224, weights='imagenet', freeze=False):
-#    return sm.Unet(backbone, input_shape=(size, size, 3), encoder_weights=weights, encoder_freeze=freeze)
+def PretrainedNet(backbone='vgg16', size=224, weights='imagenet', freeze=False):
+    return sm.Unet(backbone, input_shape=(size, size, 3), encoder_weights=weights, encoder_freeze=freeze)
 
 
 from tensorflow.keras.applications.vgg16 import VGG16
