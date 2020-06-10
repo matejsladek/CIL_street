@@ -33,7 +33,7 @@ def show_predictions(model=None, dataset=None, num=1):
         display_sample([image[0], mask[0], pred_mask[0]])
 
 
-def save_predictions2(model, size=400, normalize=True, crop=True):
+def save_predictions(model, size=400, normalize=True, crop=True, name='output'):
 
   test_path = "CIL_street/data/test_images"
   test_list = os.listdir(test_path)
@@ -73,7 +73,7 @@ def save_predictions2(model, size=400, normalize=True, crop=True):
     output = output.astype(np.uint8)
     output_img = tf.keras.preprocessing.image.array_to_img(output).resize((608, 608))
 
-    output_img.save(os.path.join('CIL_street/data/output', image_path))
+    output_img.save(os.path.join(('CIL_street/data/' + name), image_path))
 
 
 def plot_loss(model_history):
