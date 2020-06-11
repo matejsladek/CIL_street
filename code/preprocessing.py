@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 
-def parse_image(img_path: str, binary_mask=False) -> dict:
+def parse_image(img_path: str) -> dict:
     image = tf.io.read_file(img_path)
     image = tf.image.decode_png(image, channels=3)
     image = tf.image.convert_image_dtype(image, tf.uint8)
@@ -10,10 +10,14 @@ def parse_image(img_path: str, binary_mask=False) -> dict:
     mask_path = tf.strings.regex_replace(img_path, "images", "groundtruth")
     mask = tf.io.read_file(mask_path)
     mask = tf.image.decode_png(mask, channels=1)
-    if binary_mask:
-        mask = tf.where(mask > 0, np.dtype('uint8').type(1), mask)
+    # mask = tf.where(mask > 0, np.dtype('uint8').type(1), mask)
 
     return {'image': image, 'mask': mask}
+
+
+def make_binary_mask(datapoint: dict) -> dict:
+    datapoint['mask'] = tf.where(datapoint['mask'] > 0, np.dtype('uint8').type(1), datapoint['mask'])
+    return datapoint
 
 
 def get_load_image_train(size=400, normalize=True, h_flip=0.5, v_flip=0.5, rot=0.25, contrast=0, brightness=0):
