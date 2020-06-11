@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 
-def parse_image(img_path: str) -> dict:
+def parse_image(img_path: str, binary_mask=False) -> dict:
     image = tf.io.read_file(img_path)
     image = tf.image.decode_png(image, channels=3)
     image = tf.image.convert_image_dtype(image, tf.uint8)
@@ -10,7 +10,8 @@ def parse_image(img_path: str) -> dict:
     mask_path = tf.strings.regex_replace(img_path, "images", "groundtruth")
     mask = tf.io.read_file(mask_path)
     mask = tf.image.decode_png(mask, channels=1)
-    # mask = tf.where(mask > 0, np.dtype('uint8').type(1), mask)
+    if binary_mask:
+        mask = tf.where(mask > 0, np.dtype('uint8').type(1), mask)
 
     return {'image': image, 'mask': mask}
 
