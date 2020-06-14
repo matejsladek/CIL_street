@@ -15,6 +15,11 @@ def parse_image(img_path: str) -> dict:
     return {'image': image, 'mask': mask}
 
 
+def make_binary_mask(datapoint: dict) -> dict:
+    datapoint['mask'] = tf.where(datapoint['mask'] > 0, np.dtype('uint8').type(1), datapoint['mask'])
+    return datapoint
+
+
 def get_load_image_train(size=400, normalize=True, h_flip=0.5, v_flip=0.5, rot=0.25, contrast=0, brightness=0):
     @tf.function
     def load_image_train(datapoint: dict) -> tuple:
