@@ -1,11 +1,46 @@
-# taken from a blog post
-# -- Keras Functional API -- #
-# -- UNet Implementation -- #
-# Everything here is from tensorflow.keras.layers
-# I imported tensorflow.keras.layers * to make it easier to read
-
 import tensorflow as tf
 from tensorflow.keras.layers import *
+from classification_models.tfkeras import Classifiers
+
+def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_weights='imagenet', encoder_freeze=False):
+
+    decoder_filters=(256, 128, 64, 32, 16)
+    n_blocks=len(decoder_filters)
+    skip_layers_dict = {'seresnext50': (1078, 584, 254, 4), 'seresnext101': (2472, 584, 254, 4)}
+    skip_layers = skip_layers_dict[backbone_name]
+
+    backbone_fn, _ = Classifiers.get(backbone_name)
+    backbone = backbone_fn(input_shape=input_shape, weights=encoder_weights, include_top=False)
+    skips = ([backbone.get_layer(index=i).output for i in skip_layers])
+
+    x = backbone.output
+    for i in range(n_blocks):
+
+        filters = decoder_filters[i]
+
+        x = tf.keras.layers.UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(x)
+        if i < len(skips):
+            x = tf.keras.layers.Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([x, skips[i]])
+
+        x = tf.keras.layers.Conv2D(filters=filters, kernel_size=3, padding='same', activation='relu', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(x)
+        x = tf.keras.layers.BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
+        x = tf.keras.layers.Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
+
+        x = tf.keras.layers.Conv2D(filters=filters, kernel_size=3, padding='same', activation='relu', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
+        x = tf.keras.layers.BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
+        x = tf.keras.layers.Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
+
+    x = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv')(x)
+    x = tf.keras.layers.Activation('sigmoid', name='final_activation')(x)
+
+    model = tf.keras.models.Model(backbone.input, x)
+
+    if encoder_freeze:
+        for layer in model.layers:
+            if not isinstance(layer, tf.keras.layers.BatchNormalization):
+                layer.trainable = False
+
+    return model
 
 
 # the network we have been using so far
@@ -234,7 +269,7 @@ def CustomUNet(blocks=4, conv_per_block=2, filters=16, activation='relu', dropou
 import segmentation_models as sm
 
 
-def PretrainedNet(backbone='vgg16', size=224, weights='imagenet', freeze=False):
+def PretrainedNetOLD(backbone='vgg16', size=224, weights='imagenet', freeze=False):
     return sm.Unet(backbone, input_shape=(size, size, 3), encoder_weights=weights, encoder_freeze=freeze)
 
 
