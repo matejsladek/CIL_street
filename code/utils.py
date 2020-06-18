@@ -89,3 +89,9 @@ def plot_loss(model_history):
     plt.ylim([np.min(val_loss + loss) - 0.1, np.max(val_loss + loss) + 0.1])
     plt.legend()
     plt.show()
+
+def unet_freeze_encoder(model):
+  for x in model.layers:
+    if x.name.startswith("decoder"):
+      break
+    x.trainable = False
