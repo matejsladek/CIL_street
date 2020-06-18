@@ -7,9 +7,6 @@ import os
 import numpy as np
 
 def display_sample(display_list):
-    """Show side-by-side an input image,
-    the ground truth and the prediction.
-    """
     plt.figure(figsize=(18, 18))
 
     title = ['Input Image', 'True Mask', 'Predicted Mask']
@@ -27,9 +24,6 @@ def show_predictions(model=None, dataset=None, num=1):
     """
     for image, mask in dataset.take(num):
         pred_mask = model.predict(np.array(image))
-        #print(pred_mask[0, 0, 0])
-        #pred_mask = tf.argmax(pred_mask, axis=-1)
-        #pred_mask = tf.expand_dims(pred_mask, axis=-1)
         display_sample([image[0], mask[0], pred_mask[0]])
 
 
