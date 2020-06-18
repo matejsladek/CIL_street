@@ -1,4 +1,5 @@
 # source https://stackoverflow.com/questions/12507274/how-to-get-bounds-of-a-google-static-map?lq=1
+# added getCenters
 from __future__ import division
 import math
 MERCATOR_RANGE = 256
@@ -74,4 +75,18 @@ def getCorners(center, zoom, mapWidth, mapHeight):
         'E' : NELatLon.lng,
         'S' : SWLatLon.lat,
         'W' : SWLatLon.lng,
+    }
+
+
+def getCenters(center, zoom, mapWidth, mapHeight):
+    scale = 2**zoom
+    proj = MercatorProjection()
+    centerPx = proj.fromLatLngToPoint(center)
+    ECenter = G_Point(centerPx.x+mapWidth/scale, centerPx.y)
+    ELatLon = proj.fromPointToLatLng(ECenter)
+    SCenter = G_Point(centerPx.x, centerPx.y+mapHeight/scale)
+    SLatLon = proj.fromPointToLatLng(SCenter)
+    return {
+        'ECenter': (ELatLon.lat, ELatLon.lng),
+        'SCenter': (SLatLon.lat, SLatLon.lng),
     }
