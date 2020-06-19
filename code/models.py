@@ -22,11 +22,11 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
         if i < len(skips):
             x = tf.keras.layers.Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([x, skips[i]])
 
-        x = tf.keras.layers.Conv2D(filters=filters, kernel_size=3, padding='same', activation='relu', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(x)
+        x = tf.keras.layers.Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(x)
         x = tf.keras.layers.BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
         x = tf.keras.layers.Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
 
-        x = tf.keras.layers.Conv2D(filters=filters, kernel_size=3, padding='same', activation='relu', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
+        x = tf.keras.layers.Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
         x = tf.keras.layers.BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
         x = tf.keras.layers.Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
 
@@ -36,7 +36,7 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
     model = tf.keras.models.Model(backbone.input, x)
 
     if encoder_freeze:
-        for layer in model.layers:
+        for layer in backbone.layers:
             if not isinstance(layer, tf.keras.layers.BatchNormalization):
                 layer.trainable = False
 
