@@ -180,7 +180,8 @@ class KMPP_single_image:
             prec_res[i] = intersection/np.sum(bm.flatten())
             iou_res[i] = intersection/union
             
-        opt_target=prec_res+(iou_res-np.min(iou_res))/(np.max(iou_res)-np.min(iou_res))
+#        opt_target=prec_res+(iou_res-np.min(iou_res))/(np.max(iou_res)-np.min(iou_res))
+        opt_target = iou_res
         threshold_opt = threshold_tries[np.argmax(opt_target)]
         return(threshold_opt)
 
