@@ -264,23 +264,23 @@ class KMeansPP:
         self.n_data_pred = self.img_shape[0]*self.img_shape[1]
 
     def run_single_image(self,img,mask):
-        kim = KMPP_single_image()
+        ksi = KMPP_single_image()
         
-        bm = kim.gen_binary_map(mask)
+        bm = ksi.gen_binary_map(mask)
 
-        kim.n_data_train = np.sum(bm.flatten())
-        kim.n_data_pred = bm.shape[0]*bm.shape[1]
+        ksi.n_data_train = np.sum(bm.flatten())
+        ksi.n_data_pred = bm.shape[0]*bm.shape[1]
 
-        feats_scaled = kim.img_gen_feats(img,bm)
-        algo = kim.train_kmeans(feats_scaled['train'])
-        scores = kim.gen_kmeans_scores(algo,feats_scaled['pred'])
+        feats_scaled = ksi.img_gen_feats(img,bm)
+        algo = ksi.train_kmeans(feats_scaled['train'])
+        scores = ksi.gen_kmeans_scores(algo,feats_scaled['pred'])
         
-        opt_score_threshold = kim.optimize_score_threshold(scores,bm)
+        opt_score_threshold = ksi.optimize_score_threshold(scores,bm)
         bmgs = (scores > opt_score_threshold).astype('uint8')
         bmgs = bmgs.reshape((img[0],img[1]))
 
-        road_width_est = kim.get_road_width(algo)
-        area_scale = np.sqrt(kim.scaler_xy.var_[0])*np.sqrt(kim.scaler_xy.var_[1])
+        road_width_est = ksi.get_road_width(algo)
+        area_scale = np.sqrt(ksi.scaler_xy.var_[0])*np.sqrt(ksi.scaler_xy.var_[1])
         small_cluster_threshold=int((road_width_est**2)*area_scale)
         
         bmgs = bm_fill_lakes(bmgs,small_cluster_threshold)
