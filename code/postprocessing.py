@@ -137,7 +137,7 @@ class KMPP_single_image:
                     else:
                         scores[i] = km.score(feats_pred_scaled[i:i+1])
                     i+=1
-            scores = np.nan_to_num(scores,nan=np.max(scores))
+            scores = np.nan_to_num(scores,nan=np.nanmin(scores))
         else:
             for i in range(self.n_data_pred):
                 scores[i] = km.score(feats_pred_scaled[i:i+1])
