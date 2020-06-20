@@ -362,7 +362,7 @@ class KMeansPP:
         
         opt_score_threshold = ksi.optimize_score_threshold(scores,bm)
         bmgs = (scores > opt_score_threshold).astype('uint8')
-        bmgs = bmgs.reshape((img[0],img[1]))
+        bmgs = bmgs.reshape((img.shape[0],img.shape[1]))
         
         bmgs = KMPP_single_image.bm_fill_lakes(bmgs,small_cluster_threshold)
         bmgs = KMPP_single_image.bm_flood_islands(bmgs,small_cluster_threshold)
