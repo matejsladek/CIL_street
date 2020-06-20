@@ -399,12 +399,13 @@ class KMeansPP:
             
             output = self.run_single_image3(img,mask)
 
-            output = output * 255.0
+            ###
+            #output_img = tf.keras.preprocessing.image.array_to_img(output).resize((608,608))
+            #output_img.save(os.path.join(self.output_dir,file_name))
+
+            ###
+            import matplotlib.cm as cm
+            output = output*255.0
             output = output.astype(np.uint8)
-            output_img = tf.keras.preprocessing.image.array_to_img(output).resize((608,608))
-            output_img.save(os.path.join(self.output_dir,file_name))
-
-
-
-
+            plt.imsave(os.path.join(self.output_dir,file_name),output,cmap=cm.gray)
 
