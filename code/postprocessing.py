@@ -48,13 +48,7 @@ class KMPP_single_image:
         self.bm_near = np.array([])
         self.scaler_xy = StandardScaler()
         self.scaler_hsv = StandardScaler()
-        #self.feats_train_scaled = np.array([])
-        #self.feats_pred_scaled = np.array([])
         
-        #self.km = KMeans()
-        #self.bmgs
-
-
     def gen_binary_map(self,mask):
         prob_map = mask/255.0
         bm = (prob_map > self.MASK_2_BINARY_THRESHOLD).astype('uint8')
@@ -280,12 +274,6 @@ class KMeansPP:
         self.mask_dir = mask_dir
         self.output_dir = output_dir
 
-        #self.img_paths = []
-        #self.mask_paths = []
-        
-        #self.img_shape = (0,0)
-        #self.n_data_pred = 0
-
         self.img_paths = glob.glob(os.path.join(self.img_dir,'*.'+self.img_type))
         self.mask_paths = glob.glob(os.path.join(self.mask_dir,'*.'+self.img_type))
         
@@ -294,70 +282,6 @@ class KMeansPP:
         self.n_data_pred = self.img_shape[0]*self.img_shape[1]
 
     def run_single_image(self,img,mask):
-        ksi = KMPP_single_image()
-        
-        bm = ksi.gen_binary_map(mask)
-
-        ksi.n_data_train = np.sum(bm.flatten())
-        ksi.n_data_pred = bm.shape[0]*bm.shape[1]
-
-        feats_scaled = ksi.img_gen_feats(img,bm)
-        algo = ksi.train_kmeans(feats_scaled['train'])
-        #scores = ksi.gen_kmeans_scores(algo,feats_scaled['pred'])
-        #scores = ksi.gen_kmeans_scores_sklearn(algo,feats_scaled['pred'])
-        scores = ksi.gen_kmeans_scores_custom(algo,feats_scaled['pred'])
-        
-        opt_score_threshold = ksi.optimize_score_threshold(scores,bm)
-        bmgs = (scores > opt_score_threshold).astype('uint8')
-        bmgs = bmgs.reshape((img[0],img[1]))
-
-        road_width_est = ksi.get_road_width(algo)
-        area_scale = np.sqrt(ksi.scaler_xy.var_[0])*np.sqrt(ksi.scaler_xy.var_[1])
-        small_cluster_threshold=int((road_width_est**2)*area_scale)
-        
-        bmgs = KMPP_single_image.bm_fill_lakes(bmgs,small_cluster_threshold)
-        bmgs = KMPP_single_image.bm_flood_islands(bmgs,small_cluster_threshold)
-        
-        bmog = bm.copy()
-        low_prec_threshold = self.BM_IN_AREA_PREC_THRESHOLD
-        bmgs = KMPP_single_image.bm_flood_low_prec(bmgs,bmog,low_prec_threshold)
-        return(bmgs)
-
-    def run_single_image2(self,img,mask):
-        ksi = KMPP_single_image()
-        
-        bm = ksi.gen_binary_map(mask)
-        ksi.bm = bm
-
-        ksi.n_data_train = np.sum(bm.flatten())
-        ksi.n_data_pred = bm.shape[0]*bm.shape[1]
-
-        feats_scaled = ksi.img_gen_feats(img,bm)
-        algo = ksi.train_kmeans(feats_scaled['train'])
-
-        road_width_est = ksi.get_road_width(algo)
-        area_scale = np.sqrt(ksi.scaler_xy.var_[0])*np.sqrt(ksi.scaler_xy.var_[1])
-
-        small_cluster_threshold=int((road_width_est**2)*area_scale)
-        bm_dilate_factor = int(road_width_est*np.sqrt(area_scale)) 
-        ksi.bm_near = binary_dilation(bm,iterations=bm_dilate_factor) 
-
-        scores = ksi.gen_kmeans_scores(algo,feats_scaled['pred'],use_bm_near=True)
-        scores = np.nan_to_num(scores,nan=np.nanmin(scores))
-        
-        opt_score_threshold = ksi.optimize_score_threshold(scores,bm)
-        bmgs = (scores > opt_score_threshold).astype('uint8')
-        bmgs = bmgs.reshape((img[0],img[1]))
-        
-        bmgs = KMPP_single_image.bm_fill_lakes(bmgs,small_cluster_threshold)
-        bmgs = KMPP_single_image.bm_flood_islands(bmgs,small_cluster_threshold)
-        
-        bmog = bm.copy()
-        low_prec_threshold = self.BM_IN_AREA_PREC_THRESHOLD
-        bmgs = KMPP_single_image.bm_flood_low_prec(bmgs,bmog,low_prec_threshold)
-        return(bmgs)
-
-    def run_single_image3(self,img,mask):
         ksi = KMPP_single_image()
         
         bm = ksi.gen_binary_map(mask)
@@ -395,23 +319,8 @@ class KMeansPP:
         bmgs = KMPP_single_image.bm_flood_low_prec(bmgs,bmog,low_prec_threshold)
         return(bmgs)
 
-
-    def run_whole_dir(self):
-        for img_path,mask_path in list(zip(self.img_paths,self.mask_paths)):
-            name = os.path.split(img_path)[-1]
-            
-            img = np.array(Image.open(img_path))
-            mask = np.array(Image.open(mask_path))
-            
-            #output = self.run_single_image(img,mask)
-            #output = self.run_single_image2(img,mask)
-            output = self.run_single_image3(img,mask)
-
-            output = output.astype(np.uint8)
-            output_img = tf.keras.preprocessing.image.array_to_img(output)
-            output_img.save(os.path.join(self.output_dir,name))
     
-    def run_whole_dir2(self):
+    def run_whole_dir(self):
         file_idx = 0
         for img_path,mask_path in list(zip(self.img_paths,self.mask_paths)):
             file_name = os.path.split(img_path)[-1]
@@ -419,7 +328,7 @@ class KMeansPP:
             img = np.array(Image.open(img_path))
             mask = np.array(Image.open(mask_path))
             
-            output = self.run_single_image3(img,mask)
+            output = self.run_single_image(img,mask)
 
             ###
             #output_img = tf.keras.preprocessing.image.array_to_img(output).resize((608,608))
