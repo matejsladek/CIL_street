@@ -1,3 +1,13 @@
+#TODO:
+
+- pretraining with GMaps/SpaceNet (fine tuning on the original dataset with lower learning rate or frozen encoder)
+- add Jonathan's images to dataset
+- check values for image augmentations: brightness, color shift
+- reimplement model, remove dependencies on segmentation model libraries
+- try MTL (get road contour via morphological transformations)
+- finish K-NN post processing
+- train a secondary network on the K-NN output
+
 # SIMILAR PROJECTS
 - [DeepGlobe: huge competition with many solutions](http://deepglobe.org/leaderboard.html)
     - [paper](https://www.researchgate.net/publication/325215555_DeepGlobe_2018_A_Challenge_to_Parse_the_Earth_through_Satellite_Images) uses DeepLab for baseline
@@ -39,19 +49,19 @@
     - SGD
     - data augmentation is very helpful
 
-
 # ARCHITECTURES
-- currently using U-Net with pretrained seResNext50
-    - choose backbone (Marco)
-    - need to rimplement it (Marco)
-    - need to tune it (hyperparameters and architecture (dilation and aspp?)) (Marco)
-- MTL architecture using Sobel edge detection OR derivatives, if successful expand to multi label segmentation
-
+- U-Net with SeResNext-50 or 101 as backbone
+    - SeResNext101 is slightly better, maybe not worth it
+    - upsampling in decoder instead of transposed convolutions
+    - Adam with lr=0.0001
+    - batch size = 4 shows good regularization, the alternative would be batch-size=8
+    - 150 epochs, minima is usually reached around epoch 90 to 110
+    - save best model on val_loss
+    - performance depends quite a bit on the validation split
 
 # PREPROCESSING
 - standardization
 - horizontal/vertical/diagonal flips, rotations, random contrast/brightness/HSV, Gaussian Blur
-
 
 # ADDITIONAL DATA
 - mine data from GMaps
@@ -65,42 +75,19 @@
     - [SpaceNet Road (use Atlanta)](https://spacenetchallenge.github.io/datasets/spacenetRoads-summary.html)
     - [2D Semantic Labeling Contest (Postdam, Vaihingen)](http://www2.isprs.org/commissions/comm3/wg4/2d-sem-label-potsdam.html)
 
-
 # POST PROCESSING
-- try [conditional random fields](https://github.com/lucasb-eyer/pydensecrf/blob/master/examples/Non%20RGB%20Example.ipynb)
- (idea: scan image to find angle with the most streets, use that as a prior, or simply use vertical/horizontal)
-- something based on canny edge detection although is probably useless
-[link1](https://towardsdatascience.com/canny-edge-detection-step-by-step-in-python-computer-vision-b49c3a2d8123), 
-[link2](http://www.sci.utah.edu/~cscheid/spr05/imageprocessing/project4/)
-- hardcoded filter e.g. if column is mostly one, set it to 1
-- pass with a convolutional filter filling in holes and i.e. if line to the left is full and we have a hole, fill the hole
-- something based on Hough transform
-- parameterized operations on binarized outputs. morphology dilation/erosion to remove objects/holes smaller than a given threshold
-- secondary NN
-
+- CRF were not helpful
+- Helpful to do morphological transformations (dilate+erode+dilate) to remove holes and noise. No thresholding.
+- Han's 5D K-NN, maybe with more designed features, maybe in conjunction with a secondary network
 
 # OTHER IDEAS
 - double network with ce/surface loss + final network for refining predictions (separate or end to end training)
 
-
 # NOTEBOOKS
-- [Initial colab by Han](https://colab.research.google.com/drive/14Cs7Bs1DXQCTGUOj-cViJiKC47O_E2cA)
-- [U-net with tf.data](https://drive.google.com/open?id=1EgznF_kmUdJmsT0qDfY2tKxLHOZrsMdi)
-- [Simplified U-Net](https://drive.google.com/open?id=11Tx38SgUgQSCccHkl6tC7K13YFN7fd1b)
-- [Try using pretrained backbones](https://colab.research.google.com/drive/1IruU8ALJoiqHP1FqDNqtt2EpxD8Vwgpe?usp=sharing)
-- [Best performing notebook](https://colab.research.google.com/drive/11TNtlbcO_8kfSW39JXHiHJcWpIZ3NQWS?usp=sharing)
-- [Multi task learning experiment](https://colab.research.google.com/drive/1cS6_Y5TXMQnVFMGdsNavb1Nh-N_fMowI?usp=sharing)
-
-
-#TODO
-- Matej: experiment with additional data, see which dataset works best
-- Han: post processing
-- Jonathan: check out multi task learning
-- Marco: reimplement and tune the model
-
+- [Best performing notebook from June](https://colab.research.google.com/drive/11TNtlbcO_8kfSW39JXHiHJcWpIZ3NQWS?usp=sharing)
+- [Best performing notebook from July](https://colab.research.google.com/drive/12BbjdJz_upR8Q2Ta5bCH24lO0844VcnB?usp=sharing)
 
 # COMMENTS
 - test data has lots of parkings
 - total entropy is not a good measure for the quality of the output (similar values for ground truth and bad output)
-- can get around 80% accuracy by predicting always black
-- it is very hard to adapt pretrained networks. Bigger unets (resnet50 backbone) are also significantly less stable.
+- can get around 84% accuracy by predicting always black
