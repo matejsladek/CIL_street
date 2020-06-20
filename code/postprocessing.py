@@ -205,7 +205,7 @@ class KMPP_single_image:
     @staticmethod
     def bm_flood_islands(bm,small_cluster_threshold):
         lw,area = KMPP_single_image.bm_get_clusters_info(bm)
-        labels_isls = np.argwhere(area>small_hole_threshold)
+        labels_isls = np.argwhere(area>small_cluster_threshold)
         bm_flooded = np.zeros((bm.shape[0],bm.shape[1]))
         for y in range(bm.shape[0]):
             for x in range(bm.shape[1]):
@@ -283,12 +283,12 @@ class KMeansPP:
         area_scale = np.sqrt(ksi.scaler_xy.var_[0])*np.sqrt(ksi.scaler_xy.var_[1])
         small_cluster_threshold=int((road_width_est**2)*area_scale)
         
-        bmgs = bm_fill_lakes(bmgs,small_cluster_threshold)
-        bmgs = bm_flood_islands(bmgs,small_cluster_threshold)
+        bmgs = KMPP_single_image.bm_fill_lakes(bmgs,small_cluster_threshold)
+        bmgs = KMPP_single_image.bm_flood_islands(bmgs,small_cluster_threshold)
         
         bmog = bm.copy()
         low_prec_threshold = self.BM_IN_AREA_PREC_THRESHOLD
-        bmgs = bm_flood_low_prec(bmgs,bmog,low_prec_threshold)
+        bmgs = KMPP_single_image.bm_flood_low_prec(bmgs,bmog,low_prec_threshold)
         return(bmgs)
 
     def run_whole_dir(self):
