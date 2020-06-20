@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import glob
 import os
+import sys
 from PIL import Image
 
 import tensorflow as tf
@@ -391,6 +392,7 @@ class KMeansPP:
             output_img.save(os.path.join(self.output_dir,name))
     
     def run_whole_dir2(self):
+        file_idx = 0
         for img_path,mask_path in list(zip(self.img_paths,self.mask_paths)):
             file_name = os.path.split(img_path)[-1]
             
@@ -408,4 +410,10 @@ class KMeansPP:
             output = output*255.0
             output = output.astype(np.uint8)
             plt.imsave(os.path.join(self.output_dir,file_name),output,cmap=cm.gray)
+
+            message = str(file_idx)+": "+file_name+" run_whole_dir\n"
+            sys.stdout.write(message)
+            sys.stdout.flush()
+            file_idx += 1
+
 
