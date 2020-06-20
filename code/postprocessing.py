@@ -157,7 +157,8 @@ class KMPP_single_image:
                 v_c = feats_pred_scaled[i] - km.cluster_centers_[y_pred[i]]
                 scores[i] = np.dot(v_c,v_c)
                 i+=1
-        scores = -1.0*np.sqrt(scores)
+        scores = -1.0*scores
+        #scores = -1.0*np.sqrt(scores)
         return(scores)
 
     def optimize_score_threshold(self,scores,bm):
