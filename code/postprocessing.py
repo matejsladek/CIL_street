@@ -376,7 +376,9 @@ class KMeansPP:
         bm_dilate_factor = int(road_width_est*np.sqrt(area_scale)) 
         ksi.bm_near = binary_dilation(bm,iterations=bm_dilate_factor) 
 
-        scores = ksi.gen_kmeans_scores(algo,feats_scaled['pred'],use_bm_near=True)
+        #scores = ksi.gen_kmeans_scores(algo,feats_scaled['pred'])
+        #scores = ksi.gen_kmeans_scores_sklearn(algo,feats_scaled['pred'])
+        scores = ksi.gen_kmeans_scores_custom(algo,feats_scaled['pred'])
         scores = np.nan_to_num(scores,nan=np.nanmin(scores))
         
         opt_score_threshold = ksi.optimize_score_threshold(scores,bm)
