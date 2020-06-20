@@ -137,7 +137,7 @@ class KMPP_single_image:
                     else:
                         scores[i] = km.score(feats_pred_scaled[i:i+1])
                     i+=1
-            scores = np.nan_to_num(scores,nan=np.nanmin(scores))
+            #scores = np.nan_to_num(scores,nan=np.nanmin(scores))
         else:
             for i in range(self.n_data_pred):
                 scores[i] = km.score(feats_pred_scaled[i:i+1])
@@ -324,6 +324,41 @@ class KMeansPP:
         ksi.bm_near = binary_dilation(bm,iterations=bm_dilate_factor) 
 
         scores = ksi.gen_kmeans_scores(algo,feats_scaled['pred'],use_bm_near=True)
+        scores = np.nan_to_num(scores,nan=np.nanmin(scores))
+        
+        opt_score_threshold = ksi.optimize_score_threshold(scores,bm)
+        bmgs = (scores > opt_score_threshold).astype('uint8')
+        bmgs = bmgs.reshape((img[0],img[1]))
+        
+        bmgs = KMPP_single_image.bm_fill_lakes(bmgs,small_cluster_threshold)
+        bmgs = KMPP_single_image.bm_flood_islands(bmgs,small_cluster_threshold)
+        
+        bmog = bm.copy()
+        low_prec_threshold = self.BM_IN_AREA_PREC_THRESHOLD
+        bmgs = KMPP_single_image.bm_flood_low_prec(bmgs,bmog,low_prec_threshold)
+        return(bmgs)
+
+    def run_single_image3(self,img,mask):
+        ksi = KMPP_single_image()
+        
+        bm = ksi.gen_binary_map(mask)
+        ksi.bm = bm
+
+        ksi.n_data_train = np.sum(bm.flatten())
+        ksi.n_data_pred = bm.shape[0]*bm.shape[1]
+
+        feats_scaled = ksi.img_gen_feats(img,bm)
+        algo = ksi.train_kmeans(feats_scaled['train'])
+
+        road_width_est = ksi.get_road_width(algo)
+        area_scale = np.sqrt(ksi.scaler_xy.var_[0])*np.sqrt(ksi.scaler_xy.var_[1])
+
+        small_cluster_threshold=int((road_width_est**2)*area_scale)
+        bm_dilate_factor = int(road_width_est*np.sqrt(area_scale)) 
+        ksi.bm_near = binary_dilation(bm,iterations=bm_dilate_factor) 
+
+        scores = ksi.gen_kmeans_scores(algo,feats_scaled['pred'],use_bm_near=True)
+        scores = np.nan_to_num(scores,nan=np.nanmin(scores))
         
         opt_score_threshold = ksi.optimize_score_threshold(scores,bm)
         bmgs = (scores > opt_score_threshold).astype('uint8')
@@ -346,7 +381,8 @@ class KMeansPP:
             mask = np.array(Image.open(mask_path))
             
             #output = self.run_single_image(img,mask)
-            output = self.run_single_image2(img,mask)
+            #output = self.run_single_image2(img,mask)
+            output = self.run_single_image3(img,mask)
 
             output = output.astype(np.uint8)
             output_img = tf.keras.preprocessing.image.array_to_img(output)
