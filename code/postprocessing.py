@@ -125,10 +125,10 @@ class KMPP_single_image:
             n_init=10, max_iter=300, 
             tol=1e-04, random_state=0
         )
-        y_km = km.fit_predict(feats_train_scaled)
+        y_train = km.fit_predict(feats_train_scaled)
         return(km)
 
-    def gen_kmeans_scores(self,km,feats_pred_scaled,use_bm_near=True):
+    def gen_kmeans_scores_sklearn(self,km,feats_pred_scaled,use_bm_near=True):
         self.n_data_pred = feats_pred_scaled.shape[0]
         scores = np.zeros(self.n_data_pred)
         if use_bm_near:
@@ -146,14 +146,25 @@ class KMPP_single_image:
                 scores[i] = km.score(feats_pred_scaled[i:i+1])
         return(scores)
 
+    def gen_kmeans_scores_custom(self,km,feats_pred_scaled):
+        self.n_data_pred = feats_pred_scaled.shape[0]
+        scores = np.zeros(self.n_data_pred)
+        y_pred = km.predict(feats_pred_scaled)
+        i=0
+        for y in range(img.shape[0]):
+            for x in range(img.shape[1]):
+                v_c = feats_pred_scaled[i] - km.cluster_centers_[y_pred[i]]
+                scores[i] = np.dot(v_c,v_c)
+                i+=1
+        scores = -1.0*np.sqrt(scores)
+        return(scores)
+
     def optimize_score_threshold(self,scores,bm):
-        start=.01
-        end=100
-        n_points = int( 4 *np.log10(end/start))+1
-        start=np.log10(start)
-        end=np.log10(end)
+        start=np.abs(np.max(scores))
+        end=np.abs(np.min(scores))
+        n_points = int( 10 *np.log10(end/start))+1
         
-        threshold_tries = -1.0*np.logspace(start,end,n_points,base=10)
+        threshold_tries = -1.0*np.logspace(np.log10(start),np.log10(end),n_points,base=10)
         prec_res=np.zeros(len(threshold_tries))
         iou_res=np.zeros(len(threshold_tries))
         for i in range(len(threshold_tries)):    
@@ -289,7 +300,9 @@ class KMeansPP:
 
         feats_scaled = ksi.img_gen_feats(img,bm)
         algo = ksi.train_kmeans(feats_scaled['train'])
-        scores = ksi.gen_kmeans_scores(algo,feats_scaled['pred'])
+        #scores = ksi.gen_kmeans_scores(algo,feats_scaled['pred'])
+        #scores = ksi.gen_kmeans_scores_sklearn(algo,feats_scaled['pred'])
+        scores = ksi.gen_kmeans_scores_custom(algo,feats_scaled['pred'])
         
         opt_score_threshold = ksi.optimize_score_threshold(scores,bm)
         bmgs = (scores > opt_score_threshold).astype('uint8')
