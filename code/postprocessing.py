@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import glob
 import os
 from PIL import Image
+
+import tensorflow as tf
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from scipy import ndimage
