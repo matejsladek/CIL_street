@@ -43,6 +43,7 @@ class KMPP_single_image:
         self.n_data_train = 0
         self.n_data_pred = 0
         self.n_feats = self.N_FEATS
+        self.img_shape = (0,0)
         self.bm = np.array([])
         self.bm_near = np.array([])
         self.scaler_xy = StandardScaler()
@@ -151,8 +152,8 @@ class KMPP_single_image:
         scores = np.zeros(self.n_data_pred)
         y_pred = km.predict(feats_pred_scaled)
         i=0
-        for y in range(img.shape[0]):
-            for x in range(img.shape[1]):
+        for y in range(self.img_shape[0]):
+            for x in range(self.img_shape[1]):
                 v_c = feats_pred_scaled[i] - km.cluster_centers_[y_pred[i]]
                 scores[i] = np.dot(v_c,v_c)
                 i+=1
@@ -359,6 +360,8 @@ class KMeansPP:
         
         bm = ksi.gen_binary_map(mask)
         ksi.bm = bm
+        if ksi.img_shape == (0,0):
+            ksi.img_shape = np.shape(bm)
 
         ksi.n_data_train = np.sum(bm.flatten())
         ksi.n_data_pred = bm.shape[0]*bm.shape[1]
