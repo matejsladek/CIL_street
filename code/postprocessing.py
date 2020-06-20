@@ -388,6 +388,18 @@ class KMeansPP:
             output_img = tf.keras.preprocessing.image.array_to_img(output)
             output_img.save(os.path.join(self.output_dir,name))
     
+    def run_whole_dir2(self):
+        for img_path,mask_path in list(zip(self.img_paths,self.mask_paths)):
+            name = os.path.split(img_path)[-1]
+            
+            img = np.array(Image.open(img_path))
+            mask = np.array(Image.open(mask_path))
+            
+            output = self.run_single_image3(img,mask)
+
+            output = output.astype(np.uint8)
+            output_img = tf.keras.preprocessing.image.array_to_img(output)
+            output_img.save(os.path.join(self.output_dir,name))
 
 
 
