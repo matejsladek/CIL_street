@@ -15,7 +15,7 @@ from scipy.ndimage.morphology import binary_dilation
 
 MASK_2_BINARY_THRESHOLD = 0.25
 N_FEATS = 6
-N_CLUSTERS = 50
+#N_CLUSTERS = 50
 BM_IN_AREA_PREC_THRESHOLD = 0.25
 IMG_TYPE = 'png'
 
@@ -35,9 +35,11 @@ class KMPP_single_image:
     def __init__(self):
         self.MASK_2_BINARY_THRESHOLD = MASK_2_BINARY_THRESHOLD
         self.N_FEATS = N_FEATS
-        self.N_CLUSTERS = N_CLUSTERS
+        self.N_CLUSTERS = 0
         self.BM_IN_AREA_PREC_THRESHOLD = BM_IN_AREA_PREC_THRESHOLD
         self.img_type = IMG_TYPE
+
+        self.small_cluster_threshold = 0
 
         #variables for each image
         self.n_data_train = 0
@@ -141,72 +143,31 @@ class KMPP_single_image:
                 scores[i] = km.score(feats_pred_scaled[i:i+1])
         return(scores)
 
-    def gen_kmeans_scores_custom(self,km,feats_pred_scaled):
+    def gen_kmeans_scores_custom(self,km,feats_pred_scaled,use_bm_near=True):
         self.n_data_pred = feats_pred_scaled.shape[0]
         scores = np.zeros(self.n_data_pred)
         y_pred = km.predict(feats_pred_scaled)
-        i=0
-        for y in range(self.img_shape[0]):
-            for x in range(self.img_shape[1]):
-                v_c = feats_pred_scaled[i] - km.cluster_centers_[y_pred[i]]
-                scores[i] = np.dot(v_c,v_c)
-                i+=1
+        if use_bm_near:
+            i=0
+            for y in range(self.img_shape[0]):
+                for x in range(self.img_shape[1]):
+                    if self.bm_near[y][x] == 0:
+                        scores[i] = np.nan
+                    else:
+                        v_c = feats_pred_scaled[i] - km.cluster_centers_[y_pred[i]]
+                        scores[i] = np.dot(v_c,v_c)
+                    i+=1
+        else:
+            i=0
+            for y in range(self.img_shape[0]):
+                for x in range(self.img_shape[1]):
+                    v_c = feats_pred_scaled[i] - km.cluster_centers_[y_pred[i]]
+                    scores[i] = np.dot(v_c,v_c)
+                    i+=1
+
         scores = -1.0*scores
         #scores = -1.0*np.sqrt(scores)
         return(scores)
-
-    def optimize_score_threshold(self,scores,bm):
-        start=np.abs(np.max(scores))
-        end=np.abs(np.min(scores))
-        n_points = int( 10 *np.log10(end/start))+1
-        
-        threshold_tries = -1.0*np.logspace(np.log10(start),np.log10(end),n_points,base=10)
-        prec_res=np.zeros(len(threshold_tries))
-        iou_res=np.zeros(len(threshold_tries))
-        for i in range(len(threshold_tries)):    
-            bmgs = (scores > threshold_tries[i]).astype('uint8')
-            bmgs = bmgs.reshape((bm.shape[0],bm.shape[1]))
-        
-            intersection = np.sum(bm.flatten()*bmgs.flatten())
-            union_tmp = bm.flatten()+bmgs.flatten()
-            union_tmp[union_tmp>1] = 1
-            union = np.sum(union_tmp)
-        
-            prec_res[i] = intersection/np.sum(bm.flatten())
-            iou_res[i] = intersection/union
-            
-#        opt_target=prec_res+(iou_res-np.min(iou_res))/(np.max(iou_res)-np.min(iou_res))
-        opt_target = iou_res
-        threshold_opt = threshold_tries[np.argmax(opt_target)]
-        return(threshold_opt)
-
-    @staticmethod
-    def get_road_len(cc_mat,n_clusters):
-        cc_mat_flat = cc_mat.flatten()
-        idxs = np.argsort(cc_mat_flat)[n_clusters:n_clusters*2]
-        len_est = np.sum(cc_mat_flat[idxs])
-        return(len_est)
-
-    def get_road_width(self,km):
-        cluster_cents = km.cluster_centers_[:,:2]
-        n_clusters = len(cluster_cents)
-        
-        cc_mat_tmp = np.zeros((n_clusters,n_clusters,2)) #cluster to cluster
-        cc_mat_tmp[:,:,0] = np.array([cluster_cents[:,0],]*n_clusters).transpose()
-        cc_mat_tmp[:,:,1] = np.array([cluster_cents[:,1],]*n_clusters).transpose()
-        
-        cc_mat_tmp[:,:,0] = cc_mat_tmp[:,:,0]-cluster_cents[:,0]
-        cc_mat_tmp[:,:,1] = cc_mat_tmp[:,:,1]-cluster_cents[:,1]
-        
-        cc_mat_sqed = cc_mat_tmp[:,:,0]**2
-        cc_mat_sqed += cc_mat_tmp[:,:,1]**2
-        
-        cc_mat = np.sqrt(cc_mat_sqed)
-        
-        area_scale = np.sqrt(self.scaler_xy.var_[0])*np.sqrt(self.scaler_xy.var_[1])
-        road_length_est = KMPP_single_image.get_road_len(cc_mat,n_clusters)
-        road_width_est = self.n_data_train/area_scale/road_length_est
-        return(road_width_est)
 
     @staticmethod
     def bm_get_clusters_info(bm):
@@ -262,11 +223,71 @@ class KMPP_single_image:
         return(bm_high_prec)
 
 
+    def optimize_score_threshold(self,scores,bm,target):
+        start=np.abs(np.max(scores))
+        end=np.abs(np.min(scores))
+        n_points = int( 10 *np.log10(end/start))+1
+        
+        threshold_tries = -1.0*np.logspace(np.log10(start),np.log10(end),n_points,base=10)
+        prec_res=np.zeros(len(threshold_tries))
+        iou_res=np.zeros(len(threshold_tries))
+        for i in range(len(threshold_tries)):    
+            bmgs = (scores > threshold_tries[i]).astype('uint8')
+            bmgs = bmgs.reshape((bm.shape[0],bm.shape[1]))
+            #bmgs = KMPP_single_image.bm_fill_lakes(bmgs,self.small_cluster_threshold)
+        
+            intersection = np.sum(bm.flatten()*bmgs.flatten())
+            union_tmp = bm.flatten()+bmgs.flatten()
+            union_tmp[union_tmp>1] = 1
+            union = np.sum(union_tmp)
+        
+            prec_res[i] = intersection/np.sum(bm.flatten())
+            iou_res[i] = intersection/union
+
+        if target==0:
+            opt_target = iou_res
+        elif target==1:
+            opt_target = prec_res+iou_res
+        elif target==2:
+            opt_target = prec_res+(iou_res-np.min(iou_res))/(np.max(iou_res)-np.min(iou_res))
+        threshold_opt = threshold_tries[np.argmax(opt_target)]
+        return(threshold_opt)
+
+    @staticmethod
+    def get_road_len(cc_mat,n_clusters):
+        cc_mat_flat = cc_mat.flatten()
+        idxs = np.argsort(cc_mat_flat)[n_clusters:n_clusters*2]
+        len_est = np.sum(cc_mat_flat[idxs])
+        return(len_est)
+
+    def get_road_width(self,km):
+        cluster_cents = km.cluster_centers_[:,:2]
+        n_clusters = len(cluster_cents)
+        
+        cc_mat_tmp = np.zeros((n_clusters,n_clusters,2)) #cluster to cluster
+        cc_mat_tmp[:,:,0] = np.array([cluster_cents[:,0],]*n_clusters).transpose()
+        cc_mat_tmp[:,:,1] = np.array([cluster_cents[:,1],]*n_clusters).transpose()
+        
+        cc_mat_tmp[:,:,0] = cc_mat_tmp[:,:,0]-cluster_cents[:,0]
+        cc_mat_tmp[:,:,1] = cc_mat_tmp[:,:,1]-cluster_cents[:,1]
+        
+        cc_mat_sqed = cc_mat_tmp[:,:,0]**2
+        cc_mat_sqed += cc_mat_tmp[:,:,1]**2
+        
+        cc_mat = np.sqrt(cc_mat_sqed)
+        
+        area_scale = np.sqrt(self.scaler_xy.var_[0])*np.sqrt(self.scaler_xy.var_[1])
+        road_length_est = KMPP_single_image.get_road_len(cc_mat,n_clusters)
+        road_width_est = self.n_data_train/area_scale/road_length_est
+        return(road_width_est)
+
+
+
 class KMeansPP:
     def __init__(self,img_dir,mask_dir,output_dir):
         self.MASK_2_BINARY_THRESHOLD = MASK_2_BINARY_THRESHOLD
         self.N_FEATS = N_FEATS
-        self.N_CLUSTERS = N_CLUSTERS
+        #self.N_CLUSTERS = N_CLUSTERS
         self.BM_IN_AREA_PREC_THRESHOLD = BM_IN_AREA_PREC_THRESHOLD
         self.img_type = IMG_TYPE
 
@@ -289,6 +310,8 @@ class KMeansPP:
         if ksi.img_shape == (0,0):
             ksi.img_shape = np.shape(bm)
 
+        ksi.N_CLUSTERS = int(np.sum(bm)/25/25)
+
         ksi.n_data_train = np.sum(bm.flatten())
         ksi.n_data_pred = bm.shape[0]*bm.shape[1]
 
@@ -299,15 +322,20 @@ class KMeansPP:
         area_scale = np.sqrt(ksi.scaler_xy.var_[0])*np.sqrt(ksi.scaler_xy.var_[1])
 
         small_cluster_threshold=int((road_width_est**2)*area_scale)
+        ksi.small_cluster_threshold = small_cluster_threshold
         bm_dilate_factor = int(road_width_est*np.sqrt(area_scale)) 
         ksi.bm_near = binary_dilation(bm,iterations=bm_dilate_factor) 
 
         #scores = ksi.gen_kmeans_scores(algo,feats_scaled['pred'])
         #scores = ksi.gen_kmeans_scores_sklearn(algo,feats_scaled['pred'])
-        scores = ksi.gen_kmeans_scores_custom(algo,feats_scaled['pred'])
-        scores = np.nan_to_num(scores,nan=np.nanmin(scores))
+        scores = ksi.gen_kmeans_scores_custom(algo,feats_scaled['pred'],use_bm_near=True)
+
+        #scores = np.nan_to_num(scores,nan=np.nanmin(scores))
+        if np.isnan(scores).any():
+            arg_nans = np.argwhere(np.isnan(scores)).flatten()
+            scores[arg_nans] = np.nanmin(scores)
         
-        opt_score_threshold = ksi.optimize_score_threshold(scores,bm)
+        opt_score_threshold = ksi.optimize_score_threshold(scores,bm,target=0)
         bmgs = (scores > opt_score_threshold).astype('uint8')
         bmgs = bmgs.reshape((img.shape[0],img.shape[1]))
         
