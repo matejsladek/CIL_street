@@ -82,6 +82,7 @@
 
 # OTHER IDEAS
 - double network with ce/surface loss + final network for refining predictions (separate or end to end training)
+- 2016 literature survey covering every aspect of the semantic segmentation https://arxiv.org/pdf/1602.06541.pdf
 
 # NOTEBOOKS
 - [Best performing notebook from June](https://colab.research.google.com/drive/11TNtlbcO_8kfSW39JXHiHJcWpIZ3NQWS?usp=sharing)
