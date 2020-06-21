@@ -77,6 +77,7 @@
     - [2D Semantic Labeling Contest (Postdam, Vaihingen)](http://www2.isprs.org/commissions/comm3/wg4/2d-sem-label-potsdam.html)
 
 # POST PROCESSING
+- [21/06 KMeans based post-processing colab code](https://colab.research.google.com/drive/1QWsI6bJnnN2MuU65U2AbGBXkj7fdjl0m?usp=sharing) Currently pulling from experiments branch
 - CRF were not helpful
 - Helpful to do morphological transformations (dilate+erode+dilate) to remove holes and noise. No thresholding.
 - Han's 5D K-NN, maybe with more designed features, maybe in conjunction with a secondary network
