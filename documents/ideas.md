@@ -3,9 +3,10 @@
 - pretraining with GMaps/SpaceNet (fine tuning on the original dataset with lower learning rate or frozen encoder)
 - add Jonathan's images to dataset
 - check values for image augmentations: brightness, color shift
-- reimplement model, remove dependencies on segmentation model libraries
-- try MTL (get road contour via morphological transformations)
-- finish K-NN post processing
+- try different color space representations for input
+- ~~reimplement model, remove dependencies on segmentation model libraries~~
+- ~~try MTL (get road contour via morphological transformations)~~
+- ~~finish K-NN post processing~~
 - train a secondary network on the K-NN output
 
 # SIMILAR PROJECTS
