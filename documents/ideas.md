@@ -87,8 +87,8 @@
 
 # NOTEBOOKS
 - [Best performing notebook from early June](https://colab.research.google.com/drive/11TNtlbcO_8kfSW39JXHiHJcWpIZ3NQWS?usp=sharing)
-- [Best performing notebook from June 18](https://colab.research.google.com/drive/12BbjdJz_upR8Q2Ta5bCH24lO0844VcnB?usp=sharing) (after some tuning)
-- [Best performing notebook from June 22](https://colab.research.google.com/drive/1n9rgCBDHuTttykR5Fz6JNRiEO253iIu2?usp=sharing) (after dropping the library model)
+- [Best performing notebook from June 18](https://colab.research.google.com/drive/1n9rgCBDHuTttykR5Fz6JNRiEO253iIu2?usp=sharing) (after some tuning)
+- [Best performing notebook from June 22](https://colab.research.google.com/drive/12BbjdJz_upR8Q2Ta5bCH24lO0844VcnB?usp=sharing) (after dropping the library model)
 
 # COMMENTS
 - test data has lots of parkings
