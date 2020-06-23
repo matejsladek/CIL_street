@@ -1,13 +1,13 @@
-#TODO:
+# TODO:
 
 - pretraining with GMaps/SpaceNet (fine tuning on the original dataset with lower learning rate or frozen encoder)
 - add Jonathan's images to dataset
 - check values for image augmentations: brightness, color shift
 - try different color space representations for input
-- ~~reimplement model, remove dependencies on segmentation model libraries~~
-- ~~try MTL (get road contour via morphological transformations)~~
-- ~~finish K-NN post processing~~
-- train a secondary network on the K-NN output
+- finish K-NN post processing
+- different MTL architecture (?)
+- GAN based post processing
+- stacking/voting (?)
 
 # SIMILAR PROJECTS
 - [DeepGlobe: huge competition with many solutions](http://deepglobe.org/leaderboard.html)
@@ -83,12 +83,12 @@
 - Han's 5D K-NN, maybe with more designed features, maybe in conjunction with a secondary network
 
 # OTHER IDEAS
-- double network with ce/surface loss + final network for refining predictions (separate or end to end training)
 - 2016 literature survey covering every aspect of the semantic segmentation https://arxiv.org/pdf/1602.06541.pdf
 
 # NOTEBOOKS
-- [Best performing notebook from June](https://colab.research.google.com/drive/11TNtlbcO_8kfSW39JXHiHJcWpIZ3NQWS?usp=sharing)
-- [Best performing notebook from July](https://colab.research.google.com/drive/12BbjdJz_upR8Q2Ta5bCH24lO0844VcnB?usp=sharing)
+- [Best performing notebook from early June](https://colab.research.google.com/drive/11TNtlbcO_8kfSW39JXHiHJcWpIZ3NQWS?usp=sharing)
+- [Best performing notebook from June 18](https://colab.research.google.com/drive/12BbjdJz_upR8Q2Ta5bCH24lO0844VcnB?usp=sharing) (after some tuning)
+- [Best performing notebook from June 22](https://colab.research.google.com/drive/1n9rgCBDHuTttykR5Fz6JNRiEO253iIu2?usp=sharing) (after dropping the library model)
 
 # COMMENTS
 - test data has lots of parkings
