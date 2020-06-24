@@ -595,8 +595,12 @@ class KMDT_single_image:
                     cos_near[1] = prox_mat_triu[0][2]
                     cos_near[2] = prox_mat_triu[1][2]
                 feats_row = np.append(feats_row,cos_near)
-                
-                sin_near = np.sqrt(1.0-cos_near**2)
+
+                sin_sq_tmp = 1.0-cos_near**2
+                min_tmp = np.min(sin_sq_tmp)
+                if min_tmp<0:
+                    sin_sq_tmp = (sin_sq_tmp-min_tmp)/(1.0-min_tmp)
+                sin_near = np.sqrt(sin_sq_tmp)
                 ###
                 cross_near = -1.0*np.ones(3)
                 if len(idxs_near)>=2:
