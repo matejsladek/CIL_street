@@ -3,9 +3,10 @@
 - pretraining with GMaps/SpaceNet (fine tuning on the original dataset with lower learning rate or frozen encoder)
 - add Jonathan's images to dataset
 - check values for image augmentations: brightness, color shift
-- reimplement model, remove dependencies on segmentation model libraries
-- try MTL (get road contour via morphological transformations)
-- finish K-NN post processing
+- try different color space representations for input
+- ~~reimplement model, remove dependencies on segmentation model libraries~~
+- ~~try MTL (get road contour via morphological transformations)~~
+- ~~finish K-NN post processing~~
 - train a secondary network on the K-NN output
 
 # SIMILAR PROJECTS
@@ -76,12 +77,14 @@
     - [2D Semantic Labeling Contest (Postdam, Vaihingen)](http://www2.isprs.org/commissions/comm3/wg4/2d-sem-label-potsdam.html)
 
 # POST PROCESSING
+- [21/06 KMeans based post-processing colab code](https://colab.research.google.com/drive/1QWsI6bJnnN2MuU65U2AbGBXkj7fdjl0m?usp=sharing) Currently pulling from experiments branch
 - CRF were not helpful
 - Helpful to do morphological transformations (dilate+erode+dilate) to remove holes and noise. No thresholding.
 - Han's 5D K-NN, maybe with more designed features, maybe in conjunction with a secondary network
 
 # OTHER IDEAS
 - double network with ce/surface loss + final network for refining predictions (separate or end to end training)
+- 2016 literature survey covering every aspect of the semantic segmentation https://arxiv.org/pdf/1602.06541.pdf
 
 # NOTEBOOKS
 - [Best performing notebook from June](https://colab.research.google.com/drive/11TNtlbcO_8kfSW39JXHiHJcWpIZ3NQWS?usp=sharing)
