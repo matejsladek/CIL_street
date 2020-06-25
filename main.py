@@ -52,11 +52,11 @@ val_dataset = val_dataset.map(parse_image)
 val_dataset = val_dataset.map(get_load_image_test(IMG_RESIZE))
 val_dataset = val_dataset.repeat().batch(BATCH_SIZE).prefetch(buffer_size=AUTOTUNE)
 
-EPOCHS = 150
+EPOCHS = 50
 STEPS_PER_EPOCH = max(TRAINSET_SIZE // BATCH_SIZE, 1)
 VALIDATION_STEPS = max(VALSET_SIZE // BATCH_SIZE, 1)
 
-N_RUNS=1
+N_RUNS=2
 for run_id in range(N_RUNS):
     model = PretrainedUnet(backbone_name='seresnext101', input_shape=(IMG_RESIZE, IMG_RESIZE, 3), encoder_weights='imagenet', encoder_freeze=False)
     model.compile(optimizer=Adam(learning_rate=0.0001), loss = 'binary_crossentropy', metrics=['accuracy', kaggle_metric])
@@ -76,9 +76,9 @@ for run_id in range(N_RUNS):
     model.load_weights('best_model'+str(run_id)+'.h5')
 
     # compute and zip predictions
-    os.system('rm -r CIL_street/data/output')
-    os.system('mkdir CIL_street/data/output')
+    os.system('rm -r data/output')
+    os.system('mkdir data/output')
     save_predictions(model, size=IMG_RESIZE, crop=True)
-    os.system('zip -r output' + str(run_id) + '.zip CIL_street/data/output')
+    os.system('zip -r output' + str(run_id) + '.zip data/output')
     # zip tensorboard log
     os.system('zip -r log' + str(run_id) + '.zip log' + str(run_id))
