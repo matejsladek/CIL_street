@@ -5,6 +5,8 @@ import numpy as np
 def parse_image(img_path: str) -> dict:
     image = tf.io.read_file(img_path)
     image = tf.image.decode_png(image, channels=3)
+    image = tf.image.convert_image_dtype(image, tf.float16)
+    image = tf.image.rgb_to_hsv(image)
     image = tf.image.convert_image_dtype(image, tf.uint8)
 
     mask_path = tf.strings.regex_replace(img_path, "images", "groundtruth")

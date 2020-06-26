@@ -25,39 +25,47 @@ if gpus:
     except RuntimeError as e:
         print(e)
 
-SEED = 42
-dataset_path = "CIL_street/"
-training_data = "data/training/images/"
-val_data = "data/validation/images/"
-IMG_SIZE = 400
-N_CHANNELS = 3
-N_CLASSES = 2
-BUFFER_SIZE = 1000
-TRAINSET_SIZE = len(glob(training_data + "*.png"))
-VALSET_SIZE = len(glob(val_data + "*.png"))
-print(f"The Training Dataset contains {TRAINSET_SIZE} images.")
-print(f"The Validation Dataset contains {VALSET_SIZE} images.")
-
-IMG_RESIZE = 384 #384 <- best performing #416
-BATCH_SIZE = 4  # CAREFUL! Batch size must be less than validation dataset size
-
-# initialize datasets
-train_dataset = tf.data.Dataset.list_files(training_data + "*.png", seed=SEED)
-train_dataset = train_dataset.map(parse_image)
-train_dataset = train_dataset.map(get_load_image_train(IMG_RESIZE), num_parallel_calls=tf.data.experimental.AUTOTUNE)
-train_dataset = train_dataset.repeat().shuffle(buffer_size=BUFFER_SIZE, seed=SEED).batch(BATCH_SIZE).prefetch(buffer_size=AUTOTUNE)
-
-val_dataset = tf.data.Dataset.list_files(val_data + "*.png", seed=SEED)
-val_dataset = val_dataset.map(parse_image)
-val_dataset = val_dataset.map(get_load_image_test(IMG_RESIZE))
-val_dataset = val_dataset.repeat().batch(BATCH_SIZE).prefetch(buffer_size=AUTOTUNE)
-
-EPOCHS = 50
-STEPS_PER_EPOCH = max(TRAINSET_SIZE // BATCH_SIZE, 1)
-VALIDATION_STEPS = max(VALSET_SIZE // BATCH_SIZE, 1)
-
-N_RUNS=2
+N_RUNS=1
 for run_id in range(N_RUNS):
+
+    SEED = 42
+    dataset_path = "CIL_street/"
+    training_data = "data/training/images/"
+    val_data = "data/validation/images/"
+    IMG_SIZE = 400
+    N_CHANNELS = 3
+    N_CLASSES = 2
+    BUFFER_SIZE = 1000
+    TRAINSET_SIZE = len(glob(training_data + "*.png"))
+    VALSET_SIZE = len(glob(val_data + "*.png"))
+    print(f"The Training Dataset contains {TRAINSET_SIZE} images.")
+    print(f"The Validation Dataset contains {VALSET_SIZE} images.")
+
+    IMG_RESIZE = 384 #384 <- best performing #416
+    BATCH_SIZE = 4  # CAREFUL! Batch size must be less than validation 
+dataset size
+
+    # initialize datasets
+    train_dataset = tf.data.Dataset.list_files(training_data + "*.png", 
+seed=SEED)
+    train_dataset = train_dataset.map(parse_image)
+    train_dataset = train_dataset.map(get_load_image_train(IMG_RESIZE), 
+    num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    train_dataset = 
+train_dataset.repeat().shuffle(buffer_size=BUFFER_SIZE, 
+seed=SEED).batch(BATCH_SIZE).prefetch(buffer_size=AUTOTUNE)
+
+    val_dataset = tf.data.Dataset.list_files(val_data + "*.png", 
+seed=SEED)
+    val_dataset = val_dataset.map(parse_image)
+    val_dataset = val_dataset.map(get_load_image_test(IMG_RESIZE))
+    val_dataset = 
+val_dataset.repeat().batch(BATCH_SIZE).prefetch(buffer_size=AUTOTUNE)
+
+    EPOCHS = 150
+    STEPS_PER_EPOCH = max(TRAINSET_SIZE // BATCH_SIZE, 1)
+    VALIDATION_STEPS = max(VALSET_SIZE // BATCH_SIZE, 1)
+
     model = PretrainedUnet(backbone_name='seresnext101', input_shape=(IMG_RESIZE, IMG_RESIZE, 3), encoder_weights='imagenet', encoder_freeze=False)
     model.compile(optimizer=Adam(learning_rate=0.0001), loss = 'binary_crossentropy', metrics=['accuracy', kaggle_metric])
 
