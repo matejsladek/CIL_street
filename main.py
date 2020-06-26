@@ -25,8 +25,7 @@ if gpus:
     except RuntimeError as e:
         print(e)
 
-N_RUNS=1
-for run_id in range(N_RUNS):
+for run_id, train_loader in enumerate([get_load_image_train(IMG_RESIZE, h_flip=0, v_flip=0, rot=0), get_load_image_train(IMG_RESIZE), get_load_image_train(IMG_RESIZE, contrast=0.1, brightness=0.1), get_load_image_train(IMG_RESIZE, brightness=0.1), get_load_image_train(IMG_RESIZE, contrast=0.2, brightness=0.2), get_load_image_train(IMG_RESIZE, contrast=0.5, brightness=0.5)]):
 
     SEED = 42
     dataset_path = "CIL_street/"
@@ -43,13 +42,12 @@ for run_id in range(N_RUNS):
 
     IMG_RESIZE = 384 #384 <- best performing #416
     BATCH_SIZE = 4  # CAREFUL! Batch size must be less than validation 
-dataset size
 
     # initialize datasets
     train_dataset = tf.data.Dataset.list_files(training_data + "*.png", 
 seed=SEED)
     train_dataset = train_dataset.map(parse_image)
-    train_dataset = train_dataset.map(get_load_image_train(IMG_RESIZE), 
+    train_dataset = train_dataset.map(train_loader, 
     num_parallel_calls=tf.data.experimental.AUTOTUNE)
     train_dataset = 
 train_dataset.repeat().shuffle(buffer_size=BUFFER_SIZE, 
@@ -90,3 +88,12 @@ val_dataset.repeat().batch(BATCH_SIZE).prefetch(buffer_size=AUTOTUNE)
     os.system('zip -r output' + str(run_id) + '.zip data/output')
     # zip tensorboard log
     os.system('zip -r log' + str(run_id) + '.zip log' + str(run_id))
+
+
+# experiments:
+# no flips
+# flips
+# flips + constrast 0.1 + brightness 0.1
+# flips + brightness 0.1
+# flips + constrast 0.2 + brightness 0.2
+# flips + contrast 0.5 + brightness 0.5
