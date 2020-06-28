@@ -2,10 +2,10 @@
 
 - pretraining with GMaps/SpaceNet (fine tuning on the original dataset with lower learning rate or frozen encoder)
 - add Jonathan's images to dataset
-- ~~check values for image augmentations: brightness, color shift~~
-- ~~try different color space representations for input~~
+- check values for image augmentations: brightness, color shift
+- try different color space representations for input
 - finish K-NN post processing
-- ~~different MTL architecture (?)~~
+- different MTL architecture (?)
 - GAN based post processing
 - stacking/voting (?)
 

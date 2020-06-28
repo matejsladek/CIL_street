@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import *
 from tensorflow.keras import backend as K
 from scipy.ndimage import distance_transform_edt as distance
 
@@ -79,6 +78,7 @@ def bce_logdice_loss(y_true, y_pred):
     bce += (1 - y_true) * tf.math.log(1 - K.clip(y_pred, epsilon, 1. - epsilon))
     bce = -bce
     return K.mean(bce - tf.keras.backend.log(1. - soft_dice_loss(y_true, y_pred)))
+
 
 def bce_surface_loss(y_true, y_pred):
     epsilon = K.epsilon()
