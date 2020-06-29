@@ -79,11 +79,11 @@ def get_model(config):
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'],
                       loss_weights=config['loss_weights'], metrics=['accuracy', kaggle_metric])
     elif config['predict_distance']:
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0:1],
-                      loss_weights=config['loss_weights'][0:1], metrics=['accuracy', kaggle_metric])
+        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0:2],
+                      loss_weights=config['loss_weights'][0:2], metrics=['accuracy', kaggle_metric])
     elif config['predict_contour']:
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0:1],
-                      loss_weights=config['loss_weights'][0:1], metrics=['accuracy', kaggle_metric])
+        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0:2],
+                      loss_weights=config['loss_weights'][0:2], metrics=['accuracy', kaggle_metric])
     else:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0],
                       metrics=['accuracy', kaggle_metric])

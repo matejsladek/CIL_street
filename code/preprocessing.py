@@ -73,17 +73,17 @@ def get_load_image_train(size=400, normalize=True, h_flip=0.5, v_flip=0.5, rot=0
             input_mask.set_shape((384, 384, 1))
             input_contour.set_shape((384, 384, 1))
             input_distance.set_shape((384, 384, 1))
-            output = [input_mask, input_contour, input_distance]
+            output = (input_mask, input_contour, input_distance)
         elif predict_contour:
             input_contour = tf.numpy_function(func=gradient_py, inp=[input_mask], Tout=tf.float32)
             input_mask.set_shape((384, 384, 1))
             input_contour.set_shape((384, 384, 1))
-            output = [input_mask, input_contour]
+            output = (input_mask, input_contour)
         elif predict_distance:
             input_distance = tf.numpy_function(func=distance_py, inp=[input_mask], Tout=tf.float32)
             input_mask.set_shape((384, 384, 1))
             input_distance.set_shape((384, 384, 1))
-            output = [input_mask, input_distance]
+            output = (input_mask, input_distance)
 
         return input_image, output
 
