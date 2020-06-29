@@ -127,8 +127,13 @@ def run_experiment(config):
     validation_steps = max(valset_size // config['batch_size'], 1)
 
     model = get_model(config)
+
+    monitor_metric = 'val_loss'
+    if config['predict_contour'] or config['predict_distance']:
+        monitor_metric = 'val_final_activation_mask_loss'
     callbacks = [
-        tf.keras.callbacks.ModelCheckpoint(config['log_folder'] + '/best_model.h5', monitor='val_loss', verbose=1, save_best_only=True, save_weights_only=True),
+        tf.keras.callbacks.ModelCheckpoint(config['log_folder'] + '/best_model.h5', monitor=monitor_metric, verbose=1, save_best_only=True, 
+save_weights_only=True),
         tf.keras.callbacks.TensorBoard(config['log_folder'] + '/log'),
     ]
 
@@ -165,12 +170,15 @@ def run_experiment(config):
                      output_path=pred_val_path,
                      config=config)
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")
+    out_file.write("Validation loss during 
+training (min):\n" + str(np.min(model_history.history[monitor_metric])) + 
+'\n')
     out_file.write("Validation before post processing:\n")
     val_score = compute_metric(np_kaggle_metric, pred_val_path, gt_val_path)
     out_file.write(str(val_score) + "\nValidation after post processing:\n")
     postprocess(pred_val_path, postprocess_val_path)
     val_score = compute_metric(np_kaggle_metric, postprocess_val_path, gt_val_path)
-    out_file.write(str(val_score))
+    out_file.write(str(val_score) + '\n')
     out_file.close()
 
     print('Begin test for ' + config['name'])
