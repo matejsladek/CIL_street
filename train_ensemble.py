@@ -244,7 +244,6 @@ str(np.min(model_history.history[monitor_metric]))+'\n')
     val_score = compute_metric(np_kaggle_metric, postprocess_val_path, gt_val_path)
     out_file.write(str(val_score) + '\n')
     out_file.close()
-    exit(0)
 
     print('Begin test for ' + config['name'])
     save_predictions_ensemble(model=model,
