@@ -103,13 +103,13 @@ def compute_metric(metric, in_path, gt_path):
     img_paths = glob.glob(in_path + '/*.png')
     images = []
     for img_path in img_paths:
-        images.append(cv2.imread(img_path, 0))
+        images.append(cv2.imread(img_path, 0)/255.0)
     images = np.stack(images, axis=0)
 
     gt_paths = glob.glob(gt_path + '/*.png')
     gt = []
     for gt_path in gt_paths:
-        gt.append(cv2.imread(gt_path, 0))
+        gt.append(cv2.imread(gt_path, 0)/255.0)
     gt = np.stack(gt, axis=0)
 
     return metric(gt, images)
