@@ -59,6 +59,9 @@
     - 150 epochs, minima is usually reached around epoch 90 to 110
     - save best model on val_loss
     - performance depends quite a bit on the validation split
+ - Pix2Pix
+ - SVM
+ - RandomForest
 
 # PREPROCESSING
 - standardization
