@@ -12,7 +12,7 @@
   "predict_distance": false,
   "predict_contour": false,
   "batch_size": 4,
-  "epochs": 0,
+  "epochs": 30,
   "optimizer": "adam",
   "learning_rate": 0.0001,
   "loss": ["binary_crossentropy", "binary_crossentropy", "mse"],

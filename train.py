@@ -122,7 +122,7 @@ def run_experiment(config):
     train_dataset, val_dataset, trainset_size, valset_size, training_data, val_data = get_dataset(config, autotune)
 
     val_dataset_original = val_dataset
-    val_dataset2 = list(val_dataset)
+    val_dataset_2 = list(val_dataset)
     val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_2])
     val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_2])
 
@@ -150,7 +150,7 @@ def run_experiment(config):
         monitor_metric = 'val_final_activation_mask_loss'
     callbacks = [
         tf.keras.callbacks.TensorBoard(config['log_folder'] + '/log'),
-	CustomSavingCallback(),
+	CustomCallback(),
     ]
 
     print('Begin training for ' + config['name'])
