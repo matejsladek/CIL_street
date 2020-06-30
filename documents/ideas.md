@@ -1,3 +1,19 @@
+# SUMMARY OF LAST CALL:
+- Marco: RBG color space works best, adding 0.2 for brightness and constratt shift seems to work (would need to check). Tried MTL with contour + distance prediction, weighted losses and different splits in decoder. MTL with just contour, weighted losses and shared decoder works best, seems to improve from baseline, but would need more testing. It would be good for novelty. Created new branch (cluster_new) that allows for quick experiments by saving config in .json files.
+- Matej: tested with data from maps, helps a lot! Original data is still necessary for training. Tried 1800 images, will try more. Best results require 20 epochs it seems.
+- Jonathan: working on SVM and Pix2Pix, Colab is misbehaving.
+
+- We need to be careful with scraping from maps as we might take test data, althought that is very unlikely. We will mention this in the report.
+- Nonsense accuracy (~0.75) during training is due to the fact that masks are not binarized. However, binarizing them hurts training. We can just forget about it.
+
+- Open issues:
+    - If we load the weights after training and compute metrics on the validation set, they do not match with the ones during training. Is this a bug or are they computed differently? We need to check this
+    - What experimetns do we run for the report?
+    - What metric do we report? (Validation scores on fixed validation set? 5 fold CV? score on kaggle test data?)
+    
+ - We will run a couple more experiments (more data, ensemble) over the next 2 days, then meet again to discuss the report.
+
+
 # TODO:
 
 - pretraining with GMaps/SpaceNet (fine tuning on the original dataset with lower learning rate or frozen encoder)
@@ -7,7 +23,7 @@
 - finish K-NN post processing
 - ~~different MTL architecture (?)~~
 - GAN based post processing
-- stacking/voting (?)
+- ~~stacking/voting (?)~~
 
 # SIMILAR PROJECTS
 - [DeepGlobe: huge competition with many solutions](http://deepglobe.org/leaderboard.html)
