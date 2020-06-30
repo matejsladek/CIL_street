@@ -170,8 +170,7 @@ save_weights_only=True),
                      output_path=pred_val_path,
                      config=config)
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")
-    out_file.write("Validation loss during 
-training (min):\n" + str(np.min(model_history.history[monitor_metric])) + 
+    out_file.write("Validation loss during training (min):\n" + str(np.min(model_history.history[monitor_metric])) + 
 '\n')
     out_file.write("Validation before post processing:\n")
     val_score = compute_metric(np_kaggle_metric, pred_val_path, gt_val_path)
@@ -202,5 +201,5 @@ if __name__ == '__main__':
         config = json.loads(open(config_file, 'r').read())
         name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
         config['log_folder'] = 'experiments/'+name
-        os.mkdir(config['log_folder'])
+        os.makedirs(config['log_folder'])
         run_experiment(config)
