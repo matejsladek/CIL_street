@@ -121,8 +121,10 @@ def run_experiment(config):
     prepare_gpus()
     train_dataset, val_dataset, trainset_size, valset_size, training_data, val_data = get_dataset(config, autotune)
 
-    val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in list(val_dataset)])
-    val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in list(val_dataset)])
+    val_dataset_original = val_dataset
+    val_dataset2 = list(val_dataset)
+    val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_2])
+    val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_2])
 
     print(f"Training dataset contains {trainset_size} images.")
     print(f"Validation dataset contains {valset_size} images.")
@@ -130,7 +132,7 @@ def run_experiment(config):
 
     model = get_model(config)
 
-    class CustomSavingCallback(tf.keras.callbacks.Callback):
+    class CustomCallback(tf.keras.callbacks.Callback):
         #TODO: adapt for MTL
         def __init__(self):
             super(CustomCallback, self).__init__()
@@ -154,7 +156,7 @@ def run_experiment(config):
     print('Begin training for ' + config['name'])
     model_history = model.fit(train_dataset, epochs=config['epochs'],
                               steps_per_epoch=steps_per_epoch,
-                              validation_data=val_dataset,
+                              validation_data=val_dataset_original,
                               callbacks=callbacks)
 
     model.load_weights(config['log_folder'] + '/best_model.h5')
