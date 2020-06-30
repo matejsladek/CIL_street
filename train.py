@@ -58,7 +58,7 @@ def get_dataset(config, autotune):
                                           predict_contour=config['predict_contour'],
                                           predict_distance=config['predict_distance'])
     val_dataset = val_dataset.map(val_image_loader)
-    val_dataset = val_dataset.repeat().batch(config['batch_size']).prefetch(buffer_size=autotune)
+    val_dataset = val_dataset.batch(config['batch_size']).prefetch(buffer_size=autotune)
 
     return train_dataset, val_dataset, trainset_size, valset_size, training_data, val_data
 
@@ -121,26 +121,39 @@ def run_experiment(config):
     prepare_gpus()
     train_dataset, val_dataset, trainset_size, valset_size, training_data, val_data = get_dataset(config, autotune)
 
+    val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in list(val_dataset)])
+    val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in list(val_dataset)])
+
     print(f"Training dataset contains {trainset_size} images.")
     print(f"Validation dataset contains {valset_size} images.")
     steps_per_epoch = max(trainset_size // config['batch_size'], 1)
-    validation_steps = max(valset_size // config['batch_size'], 1)
 
     model = get_model(config)
+
+    class CustomSavingCallback(tf.keras.callbacks.Callback):
+        #TODO: adapt for MTL
+        def __init__(self):
+            super(CustomCallback, self).__init__()
+            self.lowest_loss = 100
+        def on_epoch_end(self, epoch, logs=None):
+            loss = model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)
+            print('Validation metrics: ' + str(loss))
+            if loss[0] < self.lowest_loss:
+                self.lowest_loss = loss[0]
+                print('New lowest loss. Saving weights.')
+                model.save_weights(config['log_folder'] + '/best_model.h5')
 
     monitor_metric = 'val_loss'
     if config['predict_contour'] or config['predict_distance']:
         monitor_metric = 'val_final_activation_mask_loss'
     callbacks = [
-        tf.keras.callbacks.ModelCheckpoint(config['log_folder'] + '/best_model.h5', monitor=monitor_metric, verbose=1, save_best_only=True, 
-save_weights_only=True),
         tf.keras.callbacks.TensorBoard(config['log_folder'] + '/log'),
+	CustomSavingCallback(),
     ]
 
     print('Begin training for ' + config['name'])
     model_history = model.fit(train_dataset, epochs=config['epochs'],
                               steps_per_epoch=steps_per_epoch,
-                              validation_steps=validation_steps,
                               validation_data=val_dataset,
                               callbacks=callbacks)
 
@@ -170,8 +183,7 @@ save_weights_only=True),
                      output_path=pred_val_path,
                      config=config)
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")
-    out_file.write("Validation loss during training (min):\n" + str(np.min(model_history.history[monitor_metric])) + 
-'\n')
+    out_file.write("Validation through evaluate():\n" + str(model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)) + '\n')
     out_file.write("Validation before post processing:\n")
     val_score = compute_metric(np_kaggle_metric, pred_val_path, gt_val_path)
     out_file.write(str(val_score) + "\nValidation after post processing:\n")
