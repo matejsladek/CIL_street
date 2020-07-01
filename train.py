@@ -15,6 +15,7 @@ from code.metrics import *
 import json
 
 
+# enable memory growth and detects gpus
 def prepare_gpus():
     print(f"Tensorflow ver. {tf.__version__}")
     gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -28,7 +29,7 @@ def prepare_gpus():
             print(e)
 
 
-# retrieves tf.Datasets from globs of images, applies preprocessing
+# retrieve tf.Datasets from globs of images paths, applies preprocessing
 def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
     # can use from_tensor_slices to speed up
     train_dataset = tf.data.Dataset.list_files(training_data_glob, seed=config['seed'])
@@ -56,7 +57,7 @@ def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
     return train_dataset, val_dataset
 
 
-# produces datasets according to config
+# produce datasets according to config
 def get_dataset(config, autotune):
     if config['dataset'] == 'original':
         training_data_root = "data/original/training/images/"
@@ -74,14 +75,15 @@ def get_dataset(config, autotune):
     return train_dataset, val_dataset, trainset_size, valset_size, training_data_root, val_data_root
 
 
+# build and compile the model
 def get_model(config):
-    backbone = config['backbone']
     learning_rate = config['learning_rate']
+
     encoder_weights = None
     if config['pretrained']:
         encoder_weights = 'imagenet'
 
-    model = PretrainedUnet(backbone_name=backbone,
+    model = PretrainedUnet(backbone_name=config['backbone'],
                            input_shape=(config['img_resize'], config['img_resize'], config['n_channels']),
                            encoder_weights=encoder_weights, encoder_freeze=False,
                            predict_distance=config['predict_distance'], predict_contour=config['predict_contour'])
@@ -102,6 +104,7 @@ def get_model(config):
     return model
 
 
+# retrieve the postprocessing method according to config
 def get_postprocess(config):
     if config['postprocess'] == 'morphological':
         return morphological_postprocessing
@@ -110,22 +113,7 @@ def get_postprocess(config):
     raise Exception('Unknown postprocessing')
 
 
-def compute_metric(metric, in_path, gt_path):
-    img_paths = glob.glob(in_path + '/*.png')
-    images = []
-    for img_path in img_paths:
-        images.append(cv2.imread(img_path, 0)/255.0)
-    images = np.stack(images, axis=0)
-
-    gt_paths = glob.glob(gt_path + '/*.png')
-    gt = []
-    for gt_path in gt_paths:
-        gt.append(cv2.imread(gt_path, 0)/255.0)
-    gt = np.stack(gt, axis=0)
-
-    return metric(gt, images)
-
-
+# create the model and train it, load weights from epoch with best val loss
 def create_and_train_model(train_dataset, val_dataset_original, val_dataset_numpy, steps_per_epoch, config):
     model = get_model(config)
     val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
@@ -149,7 +137,6 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
         CustomCallback(),
     ]
 
-    print('Begin training for ' + config['name'])
     model_history = model.fit(train_dataset, epochs=config['epochs'],
                               steps_per_epoch=steps_per_epoch,
                               validation_data=val_dataset_original,
@@ -158,12 +145,16 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
     model.load_weights(config['log_folder'] + '/best_model.h5')
     return model
 
+
 def run_experiment(config):
 
     autotune = tf.data.experimental.AUTOTUNE
     prepare_gpus()
+
+    print('Load dataset for ' + config['name'])
     train_dataset, val_dataset, trainset_size, valset_size, training_data_root, val_data_root = get_dataset(config, autotune)
 
+    # TODO: move to method
     val_dataset_original = val_dataset
     val_dataset_2 = list(val_dataset)
     val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_2])
@@ -174,21 +165,22 @@ def run_experiment(config):
     print(f"Validation dataset contains {valset_size} images.")
     steps_per_epoch = max(trainset_size // config['batch_size'], 1)
 
+    print('Begin training')
     model = create_and_train_model(train_dataset, val_dataset_original, val_dataset_numpy, steps_per_epoch, config)
 
     postprocess = get_postprocess(config)
 
-    # report validation scores
+    print('Saving validation scores')
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")
     out_file.write("Validation results\n")
     out_file.write("Results of model.evaluate: \n")
     out_file.write(str(model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)))
     out_file.write("\nKaggle metric on predictions: \n")
-    predictions = tf.image.resize(model.predict(val_dataset_numpy_x), [400, 400])
-    out_file.write(str(kaggle_metric(predictions, tf.image.resize(val_dataset_numpy_y, [400, 400])).numpy()))
+    predictions = tf.image.resize(model.predict(val_dataset_numpy_x), [config['img_size'], config['img_size']])
+    out_file.write(str(kaggle_metric(predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
     out_file.write("\nKaggle metric on predictions after post processing: \n")
     postprocessed_predictions = postprocess(predictions.numpy())
-    out_file.write(str(kaggle_metric(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [400, 400])).numpy()))
+    out_file.write(str(kaggle_metric(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
     out_file.write('\n')
     out_file.close()
     print('Validation is successful')
@@ -199,7 +191,7 @@ def run_experiment(config):
     postprocess_test_path = os.path.join(config['log_folder'], "postprocess_test")
     os.mkdir(postprocess_test_path)
 
-    # now for each image in the test set, save predictions before and after post processing
+    print('Saving predictions')
     save_predictions(model=model,
                      crop=True,
                      input_path=in_test_path,
