@@ -148,13 +148,16 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
     return model
 
 
-def run_experiment(config):
+def prep_experiment(config,autotune):
+    print('Load dataset for ' + config['name'])
+    return get_dataset(config, autotune)
 
+
+def run_experiment(config,prep_function):
     autotune = tf.data.experimental.AUTOTUNE
     prepare_gpus()
 
-    print('Load dataset for ' + config['name'])
-    train_dataset, val_dataset, trainset_size, valset_size, training_data_root, val_data_root = get_dataset(config, autotune)
+    train_dataset, val_dataset, trainset_size, valset_size, training_data_root, val_data_root = prep_function(config,autotune)
 
     # TODO: move to method
     val_dataset_original = val_dataset
@@ -228,4 +231,4 @@ if __name__ == '__main__':
         name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
         config['log_folder'] = 'experiments/'+name
         os.makedirs(config['log_folder'])
-        run_experiment(config)
+        run_experiment(config,prep_experiment)
