@@ -28,16 +28,9 @@ def prepare_gpus():
             print(e)
 
 
-def get_dataset(config, autotune):
-    if config['dataset'] == 'original':
-        training_data = "data/original/training/images/"
-    else:
-        raise Exception('Unrecognised dataset')
-    val_data = training_data.replace('training', 'validation')
-    trainset_size = len(glob.glob(training_data + "*.png"))
-    valset_size = len(glob.glob(val_data + "*.png"))
-
-    train_dataset = tf.data.Dataset.list_files(training_data + "*.png", seed=config['seed'])
+def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
+    # can use from_tensor_slices to speed up
+    train_dataset = tf.data.Dataset.list_files(training_data_glob, seed=config['seed'])
     train_dataset = train_dataset.map(parse_image)
     train_image_loader = get_load_image_train(size=config['img_resize'],
                                               normalize=config['normalize'],
@@ -52,15 +45,31 @@ def get_dataset(config, autotune):
     train_dataset = train_dataset.repeat().shuffle(buffer_size=config['buffer_size'], seed=config['seed'])\
         .batch(config['batch_size']).prefetch(buffer_size=autotune)
 
-    val_dataset = tf.data.Dataset.list_files(val_data + "*.png", seed=config['seed'])
+    val_dataset = tf.data.Dataset.list_files(val_data_glob, shuffle=False, seed=config['seed'])
     val_dataset = val_dataset.map(parse_image)
     val_image_loader = get_load_image_val(size=config['img_resize'], normalize=config['normalize'],
                                           predict_contour=config['predict_contour'],
                                           predict_distance=config['predict_distance'])
     val_dataset = val_dataset.map(val_image_loader)
     val_dataset = val_dataset.batch(config['batch_size']).prefetch(buffer_size=autotune)
+    return train_dataset, val_dataset
 
-    return train_dataset, val_dataset, trainset_size, valset_size, training_data, val_data
+
+def get_dataset(config, autotune):
+    if config['dataset'] == 'original':
+        training_data_root = "data/original/training/images/"
+    else:
+        raise Exception('Unrecognised dataset')
+    val_data_root = training_data_root.replace('training', 'validation')
+
+    training_data_glob = glob.glob(training_data_root + "*.png")
+    val_data_glob = glob.glob(val_data_root + "*.png")
+    trainset_size = len(training_data_glob)
+    valset_size = len(val_data_glob)
+
+    train_dataset, val_dataset = get_dataset_from_path(training_data_glob, val_data_glob, config, autotune)
+
+    return train_dataset, val_dataset, trainset_size, valset_size, training_data_root, val_data_root
 
 
 def get_model(config):
@@ -115,32 +124,21 @@ def compute_metric(metric, in_path, gt_path):
     return metric(gt, images)
 
 
-def run_experiment(config):
-
-    autotune = tf.data.experimental.AUTOTUNE
-    prepare_gpus()
-    train_dataset, val_dataset, trainset_size, valset_size, training_data, val_data = get_dataset(config, autotune)
-
-    val_dataset_original = val_dataset
-    val_dataset_2 = list(val_dataset)
-    val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_2])
-    val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_2])
-
-    print(f"Training dataset contains {trainset_size} images.")
-    print(f"Validation dataset contains {valset_size} images.")
-    steps_per_epoch = max(trainset_size // config['batch_size'], 1)
-
+def create_and_train_model(train_dataset, val_dataset_original, val_dataset_numpy, steps_per_epoch, config):
     model = get_model(config)
+    val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
 
     class CustomCallback(tf.keras.callbacks.Callback):
-        #TODO: adapt for MTL
+        # TODO: adapt for MTL
         def __init__(self):
             super(CustomCallback, self).__init__()
             self.lowest_loss = 100
+
         def on_epoch_end(self, epoch, logs=None):
             loss = model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)
             print('Validation metrics: ' + str(loss))
-            loss2 = kaggle_metric(tf.image.resize(model.predict(val_dataset_numpy_x), [400, 400]), tf.image.resize(val_dataset_numpy_y, [400, 400]))
+            loss2 = kaggle_metric(tf.image.resize(model.predict(val_dataset_numpy_x), [400, 400]),
+                                  tf.image.resize(val_dataset_numpy_y, [400, 400]))
             print('Validation metrics: ' + str(loss2))
             if loss[0] < self.lowest_loss:
                 self.lowest_loss = loss[0]
@@ -152,7 +150,7 @@ def run_experiment(config):
         monitor_metric = 'val_final_activation_mask_loss'
     callbacks = [
         tf.keras.callbacks.TensorBoard(config['log_folder'] + '/log'),
-	CustomCallback(),
+        CustomCallback(),
     ]
 
     print('Begin training for ' + config['name'])
@@ -162,10 +160,30 @@ def run_experiment(config):
                               callbacks=callbacks)
 
     model.load_weights(config['log_folder'] + '/best_model.h5')
+    return model
+
+def run_experiment(config):
+
+    autotune = tf.data.experimental.AUTOTUNE
+    prepare_gpus()
+    train_dataset, val_dataset, trainset_size, valset_size, training_data_root, val_data_root = get_dataset(config, autotune)
+
+    val_dataset_original = val_dataset
+    val_dataset_2 = list(val_dataset)
+    val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_2])
+    val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_2])
+    val_dataset_numpy = (val_dataset_numpy_x, val_dataset_numpy_y)
+
+    print(f"Training dataset contains {trainset_size} images.")
+    print(f"Validation dataset contains {valset_size} images.")
+    steps_per_epoch = max(trainset_size // config['batch_size'], 1)
+
+    model = create_and_train_model(train_dataset, val_dataset_original, val_dataset_numpy, steps_per_epoch, config)
+
     postprocess = get_postprocess(config)
 
-    in_val_path = val_data
-    gt_val_path = val_data.replace('images', 'groundtruth')
+    in_val_path = val_data_root
+    gt_val_path = val_data_root.replace('images', 'groundtruth')
     pred_val_path = os.path.join(config['log_folder'], "pred_val")
     os.mkdir(pred_val_path)
     postprocess_val_path = os.path.join(config['log_folder'], "postprocess_val")
