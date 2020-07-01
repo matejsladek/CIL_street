@@ -119,16 +119,18 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
     val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
 
     class CustomCallback(tf.keras.callbacks.Callback):
-        # TODO: adapt for MTL
         def __init__(self):
             super(CustomCallback, self).__init__()
             self.lowest_loss = 100
+            self.metric_index = 0
+            if config['predict_contour'] or config['predict_distance']:
+                self.metric_index = 1
 
         def on_epoch_end(self, epoch, logs=None):
             loss = model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)
             print('Validation metrics: ' + str(loss))
-            if loss[0] < self.lowest_loss:
-                self.lowest_loss = loss[0]
+            if loss[self.metric_index] < self.lowest_loss:
+                self.lowest_loss = loss[self.metric_index]
                 print('New lowest loss. Saving weights.')
                 model.save_weights(config['log_folder'] + '/best_model.h5')
 
@@ -141,8 +143,8 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
                               steps_per_epoch=steps_per_epoch,
                               validation_data=val_dataset_original,
                               callbacks=callbacks)
-    
-    model.load_weights(config['log_folder'] + '/best_model.h5')
+    if config['epochs']>0:
+        model.load_weights(config['log_folder'] + '/best_model.h5')
     return model
 
 
@@ -183,11 +185,18 @@ def run_experiment(config):
     out_file.write("Results of model.evaluate: \n")
     out_file.write(str(model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)))
     out_file.write("\nKaggle metric on predictions: \n")
-    predictions = tf.image.resize(model.predict(val_dataset_numpy_x), [config['img_size'], config['img_size']])
-    out_file.write(str(kaggle_metric(predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
+    if config['predict_contour'] or config['predict_distance']:
+        predictions = tf.image.resize(model.predict(val_dataset_numpy_x)[0], [config['img_size'], config['img_size']])
+        out_file.write(str(kaggle_metric(predictions, tf.image.resize(val_dataset_numpy_y[0], [config['img_size'], config['img_size']])).numpy()))
+    else:
+        predictions = tf.image.resize(model.predict(val_dataset_numpy_x), [config['img_size'], config['img_size']])
+        out_file.write(str(kaggle_metric(predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
     out_file.write("\nKaggle metric on predictions after post processing: \n")
     postprocessed_predictions = postprocess(predictions.numpy())
-    out_file.write(str(kaggle_metric(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
+    if config['predict_contour'] or config['predict_distance']:
+        out_file.write(str(kaggle_metric(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y[0], [config['img_size'], config['img_size']])).numpy()))
+    else:
+        out_file.write(str(kaggle_metric(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
     out_file.write('\n')
     out_file.close()
     print('Validation is successful')
