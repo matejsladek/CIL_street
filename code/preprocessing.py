@@ -3,17 +3,20 @@ import numpy as np
 import cv2
 from scipy import ndimage
 
-def parse_image(img_path: str) -> dict:
-    image = tf.io.read_file(img_path)
-    image = tf.image.decode_png(image, channels=3)
-    image = tf.image.convert_image_dtype(image, tf.uint8)
+def get_parse_image(hard=True):
+    def parse_image(img_path: str) -> dict:
+        image = tf.io.read_file(img_path)
+        image = tf.image.decode_png(image, channels=3)
+        image = tf.image.convert_image_dtype(image, tf.uint8)
 
-    mask_path = tf.strings.regex_replace(img_path, "images", "groundtruth")
-    mask = tf.io.read_file(mask_path)
-    mask = tf.image.decode_png(mask, channels=1)
-    # mask = tf.where(mask > 0, np.dtype('uint8').type(1), mask)
+        mask_path = tf.strings.regex_replace(img_path, "images", "groundtruth")
+        mask = tf.io.read_file(mask_path)
+        mask = tf.image.decode_png(mask, channels=1)
+        if hard:
+            mask = tf.where(mask > 128, np.dtype('uint8').type(255), np.dtype('uint8').type(0))
 
-    return {'image': image, 'mask': mask}
+        return {'image': image, 'mask': mask}
+    return parse_image
 
 
 def make_binary_mask(datapoint: dict) -> dict:

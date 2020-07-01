@@ -33,7 +33,7 @@ def prepare_gpus():
 def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
     # can use from_tensor_slices to speed up
     train_dataset = tf.data.Dataset.list_files(training_data_glob, seed=config['seed'])
-    train_dataset = train_dataset.map(parse_image)
+    train_dataset = train_dataset.map(get_parse_image(hard=config['hard_mask']))
     train_image_loader = get_load_image_train(size=config['img_resize'],
                                               normalize=config['normalize'],
                                               h_flip=config['h_flip'],
@@ -48,7 +48,7 @@ def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
         .batch(config['batch_size']).prefetch(buffer_size=autotune)
 
     val_dataset = tf.data.Dataset.list_files(val_data_glob, shuffle=False, seed=config['seed'])
-    val_dataset = val_dataset.map(parse_image)
+    val_dataset = val_dataset.map(get_parse_image(hard=config['hard_mask']))
     val_image_loader = get_load_image_val(size=config['img_resize'], normalize=config['normalize'],
                                           predict_contour=config['predict_contour'],
                                           predict_distance=config['predict_distance'])
