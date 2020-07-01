@@ -166,8 +166,15 @@ def run_experiment(config):
 
     val_dataset_original = val_dataset
     val_dataset_2 = list(val_dataset)
-    val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_2])
-    val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_2])
+
+    if config['predict_contour'] or config['predict_distance']:
+        val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_2])
+        val_dataset_numpy_y_mask = np.concatenate([b[0].numpy()[:, ...] for a,b in val_dataset_2])
+        val_dataset_numpy_y_new_task1 = np.concatenate([b[1].numpy()[:, ...] for a,b in val_dataset_2])
+        val_dataset_numpy_y = (val_dataset_numpy_y_mask, val_dataset_numpy_y_new_task1)
+    else:
+        val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_2])
+        val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_2])
     val_dataset_numpy = (val_dataset_numpy_x, val_dataset_numpy_y)
 
     print(f"Training dataset contains {trainset_size} images.")
