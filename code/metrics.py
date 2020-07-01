@@ -56,6 +56,4 @@ def np_kaggle_metric(y_true, y_pred):
 
 
 def kaggle_metric(y_true, y_pred):
-    return tf.numpy_function(np_kaggle_metric, [tf.image.resize(y_true, 
-[400, 400]), 
-tf.image.resize(y_pred, [400, 400])], tf.float32)
+    return tf.numpy_function(np_kaggle_metric, [tf.image.resize(y_true, [400, 400]), tf.image.resize(y_pred, [400, 400])], tf.float32)

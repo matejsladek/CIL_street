@@ -34,21 +34,27 @@ def show_predictions(model=None, dataset=None, num=1):
         display_sample([image[0], mask[0], pred_mask[0]])
 
 
-def save_predictions(model, model_size, output_size, normalize, crop, input_path, output_path, config):
+def save_predictions(model, crop, input_path, output_path, postprocessed_output_path, config, postprocess=None):
+    model_size = config['img_resize'],
+    output_size = config['img_size_test'],
+    normalize = config['normalize'],
 
-    test_list = os.listdir(input_path)
-    test_list.sort()
+    test_list = glob.glob(input_path + '/*.png')
 
     for image_path in test_list:
+        print(image_path)
         if crop:
-            image = np.array(Image.open(os.path.join(input_path, image_path)))
+            image = tf.io.read_file(image_path)
+            image = tf.image.decode_png(image, channels=3)
+            image = tf.image.convert_image_dtype(image, tf.uint8)
+            if normalize:
+                image = tf.cast(image, tf.float32) / 255.0
+
             img_parts = [image[:400, :400, :], image[:400, -400:, :], image[-400:, :400, :], image[-400:, -400:, :]]
             out_parts = []
             for img in img_parts:
-                resized_img = np.array(Image.fromarray(img).resize((model_size,model_size)))
+                resized_img = tf.image.resize(img, (384, 384)).numpy()
                 resized_img = np.expand_dims(resized_img, 0)
-                if normalize:
-                    resized_img = resized_img/255.0
                 if config['predict_contour'] or config['predict_distance']:
                     output = model.predict(resized_img)[0][0]
                 else:
@@ -64,21 +70,33 @@ def save_predictions(model, model_size, output_size, normalize, crop, input_path
             output[-304:, -304:] = out_parts[3][-304:, -304:]
             output = np.expand_dims(output, -1)
         else:
-            image = np.array(Image.open(os.path.join(input_path, image_path)).resize((model_size, model_size)))
-            image = np.expand_dims(image, 0)
+            image = tf.io.read_file(image_path)
+            image = tf.image.decode_png(image, channels=3)
+            image = tf.image.convert_image_dtype(image, tf.uint8)
+            image = tf.image.resize(image, (384, 384))
             if normalize:
-                image = image/255.0
+                image = tf.cast(image, tf.float32) / 255.0
+            image = image.numpy()
+            image = np.expand_dims(image, 0)
+
             if config['predict_contour'] or config['predict_distance']:
                 output = model.predict(image)[0][0]
             else:
                 output = model.predict(image)[0]
+
             if normalize:
                 output = output * 255.0
 
         output = output.astype(np.uint8)
-        output_img = tf.keras.preprocessing.image.array_to_img(output).resize((output_size, output_size))
+        output_img = tf.keras.preprocessing.image.array_to_img(output).resize((608, 608))
 
-        output_img.save(output_path + '/' + image_path)
+        image_name = os.path.basename(image_path)
+        output_img.save(output_path + '/' + image_name)
+        if postprocess is None:
+            return
+        postprocessed_output = np.squeeze(postprocess(np.expand_dims(output, 0)), axis=0)
+        postprocessed_output_img = tf.keras.preprocessing.image.array_to_img(postprocessed_output).resize((608, 608))
+        postprocessed_output_img.save(postprocessed_output_path + '/' + image_name)
 
 
 def plot_loss(model_history):

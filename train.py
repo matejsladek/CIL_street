@@ -28,6 +28,7 @@ def prepare_gpus():
             print(e)
 
 
+# retrieves tf.Datasets from globs of images, applies preprocessing
 def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
     # can use from_tensor_slices to speed up
     train_dataset = tf.data.Dataset.list_files(training_data_glob, seed=config['seed'])
@@ -55,6 +56,7 @@ def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
     return train_dataset, val_dataset
 
 
+# produces datasets according to config
 def get_dataset(config, autotune):
     if config['dataset'] == 'original':
         training_data_root = "data/original/training/images/"
@@ -137,17 +139,11 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
         def on_epoch_end(self, epoch, logs=None):
             loss = model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)
             print('Validation metrics: ' + str(loss))
-            loss2 = kaggle_metric(tf.image.resize(model.predict(val_dataset_numpy_x), [400, 400]),
-                                  tf.image.resize(val_dataset_numpy_y, [400, 400]))
-            print('Validation metrics: ' + str(loss2))
             if loss[0] < self.lowest_loss:
                 self.lowest_loss = loss[0]
                 print('New lowest loss. Saving weights.')
                 model.save_weights(config['log_folder'] + '/best_model.h5')
 
-    monitor_metric = 'val_loss'
-    if config['predict_contour'] or config['predict_distance']:
-        monitor_metric = 'val_final_activation_mask_loss'
     callbacks = [
         tf.keras.callbacks.TensorBoard(config['log_folder'] + '/log'),
         CustomCallback(),
@@ -158,7 +154,7 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
                               steps_per_epoch=steps_per_epoch,
                               validation_data=val_dataset_original,
                               callbacks=callbacks)
-
+    
     model.load_weights(config['log_folder'] + '/best_model.h5')
     return model
 
@@ -182,12 +178,20 @@ def run_experiment(config):
 
     postprocess = get_postprocess(config)
 
-    in_val_path = val_data_root
-    gt_val_path = val_data_root.replace('images', 'groundtruth')
-    pred_val_path = os.path.join(config['log_folder'], "pred_val")
-    os.mkdir(pred_val_path)
-    postprocess_val_path = os.path.join(config['log_folder'], "postprocess_val")
-    os.mkdir(postprocess_val_path)
+    # report validation scores
+    out_file = open(config['log_folder'] + "/validation_score.txt", "w")
+    out_file.write("Validation results\n")
+    out_file.write("Results of model.evaluate: \n")
+    out_file.write(str(model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)))
+    out_file.write("\nKaggle metric on predictions: \n")
+    predictions = tf.image.resize(model.predict(val_dataset_numpy_x), [400, 400])
+    out_file.write(str(kaggle_metric(predictions, tf.image.resize(val_dataset_numpy_y, [400, 400])).numpy()))
+    out_file.write("\nKaggle metric on predictions after post processing: \n")
+    postprocessed_predictions = postprocess(predictions.numpy())
+    out_file.write(str(kaggle_metric(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [400, 400])).numpy()))
+    out_file.write('\n')
+    out_file.close()
+    print('Validation is successful')
 
     in_test_path = 'data/test_images'
     pred_test_path = os.path.join(config['log_folder'], "pred_test")
@@ -195,46 +199,22 @@ def run_experiment(config):
     postprocess_test_path = os.path.join(config['log_folder'], "postprocess_test")
     os.mkdir(postprocess_test_path)
 
-    print(np_kaggle_metric(tf.image.resize(model.predict(val_dataset_numpy_x), [400, 400]), tf.image.resize(val_dataset_numpy_y, [400, 400])))
-    print(model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y))
-
-    print('Begin validation for ' + config['name'])
+    # now for each image in the test set, save predictions before and after post processing
     save_predictions(model=model,
-                     model_size=config['img_resize'],
-                     output_size=config['img_size'],
-                     normalize=config['normalize'],
-                     crop=False,
-                     input_path=in_val_path,
-                     output_path=pred_val_path,
-                     config=config)
-    out_file = open(config['log_folder'] + "/validation_score.txt", "w")
-    out_file.write("Validation through evaluate():\n" + str(model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)) + '\n')
-    out_file.write("Validation before post processing:\n")
-    val_score = compute_metric(np_kaggle_metric, pred_val_path, gt_val_path)
-    print(val_score)
-    out_file.write(str(val_score) + "\nValidation after post processing:\n")
-    postprocess(pred_val_path, postprocess_val_path)
-    val_score = compute_metric(np_kaggle_metric, postprocess_val_path, gt_val_path)
-    out_file.write(str(val_score) + '\n')
-    out_file.close()
-
-    print('Begin test for ' + config['name'])
-    save_predictions(model=model,
-                     model_size=config['img_resize'],
-                     output_size=config['img_size_test'],
-                     normalize=config['normalize'],
                      crop=True,
                      input_path=in_test_path,
                      output_path=pred_test_path,
-                     config=config)
+                     postprocessed_output_path=postprocess_test_path,
+                     config=config,
+                     postprocess=postprocess)
     to_csv(pred_test_path, os.path.join(config['log_folder'], 'pred_submission.csv'))
-    postprocess(pred_test_path, postprocess_test_path)
     to_csv(postprocess_test_path, os.path.join(config['log_folder'],'postprocess_submission.csv'))
 
     print('Finished ' + config['name'])
 
 
 if __name__ == '__main__':
+    # load each config file and run the experiment
     for config_file in glob.glob('config/' + "*.json"):
         config = json.loads(open(config_file, 'r').read())
         name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
