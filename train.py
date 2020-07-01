@@ -140,6 +140,8 @@ def run_experiment(config):
         def on_epoch_end(self, epoch, logs=None):
             loss = model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)
             print('Validation metrics: ' + str(loss))
+            loss2 = kaggle_metric(tf.image.resize(model.predict(val_dataset_numpy_x), [400, 400]), tf.image.resize(val_dataset_numpy_y, [400, 400]))
+            print('Validation metrics: ' + str(loss2))
             if loss[0] < self.lowest_loss:
                 self.lowest_loss = loss[0]
                 print('New lowest loss. Saving weights.')
@@ -175,6 +177,9 @@ def run_experiment(config):
     postprocess_test_path = os.path.join(config['log_folder'], "postprocess_test")
     os.mkdir(postprocess_test_path)
 
+    print(np_kaggle_metric(tf.image.resize(model.predict(val_dataset_numpy_x), [400, 400]), tf.image.resize(val_dataset_numpy_y, [400, 400])))
+    print(model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y))
+
     print('Begin validation for ' + config['name'])
     save_predictions(model=model,
                      model_size=config['img_resize'],
@@ -188,6 +193,7 @@ def run_experiment(config):
     out_file.write("Validation through evaluate():\n" + str(model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)) + '\n')
     out_file.write("Validation before post processing:\n")
     val_score = compute_metric(np_kaggle_metric, pred_val_path, gt_val_path)
+    print(val_score)
     out_file.write(str(val_score) + "\nValidation after post processing:\n")
     postprocess(pred_val_path, postprocess_val_path)
     val_score = compute_metric(np_kaggle_metric, postprocess_val_path, gt_val_path)

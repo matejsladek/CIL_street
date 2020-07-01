@@ -47,6 +47,7 @@ def np_kaggle_metric_old(y_true, y_pred):
 
 def np_kaggle_metric(y_true, y_pred):
     patch_size = 16
+    
     y_true = y_true.reshape(y_true.shape[0], int(y_true.shape[1]/patch_size), patch_size, int(y_true.shape[2]/patch_size), patch_size)
     y_pred = y_pred.reshape(y_true.shape[0], int(y_pred.shape[1]/patch_size), patch_size, int(y_pred.shape[2]/patch_size), patch_size)
     y_true = np.where(np.sum(y_true, axis=(2, 4))/(patch_size**2) > 0.25, 1, 0)
@@ -55,4 +56,6 @@ def np_kaggle_metric(y_true, y_pred):
 
 
 def kaggle_metric(y_true, y_pred):
-    return tf.numpy_function(np_kaggle_metric, [y_true, y_pred], tf.float32)
+    return tf.numpy_function(np_kaggle_metric, [tf.image.resize(y_true, 
+[400, 400]), 
+tf.image.resize(y_pred, [400, 400])], tf.float32)
