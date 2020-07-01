@@ -128,7 +128,9 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
 
         def on_epoch_end(self, epoch, logs=None):
             loss = model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)
-            print('Validation metrics: ' + str(loss))
+            print('\nValidation metrics: ' + str(loss))
+            loss2 = kaggle_metric(model.predict(val_dataset_numpy_x)[0], val_dataset_numpy_y[0])
+            print('Loss2: ' + str(loss2))
             if loss[self.metric_index] < self.lowest_loss:
                 self.lowest_loss = loss[self.metric_index]
                 print('New lowest loss. Saving weights.')
@@ -138,6 +140,9 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
         tf.keras.callbacks.TensorBoard(config['log_folder'] + '/log'),
         CustomCallback(),
     ]
+
+    loss2 = kaggle_metric(model.predict(val_dataset_numpy_x)[0], val_dataset_numpy_y[0])
+    print('Loss2: ' + str(loss2))
 
     model_history = model.fit(train_dataset, epochs=config['epochs'],
                               steps_per_epoch=steps_per_epoch,
