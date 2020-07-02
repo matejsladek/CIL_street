@@ -10,6 +10,7 @@ from tensorflow.keras.optimizers import Adam
 import random
 import json
 import shutil
+import argparse
 
 from code.preprocessing import *
 from code.postprocessing import *
@@ -127,8 +128,15 @@ def run_experiment_cv(config,prep_function):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c','--config_dir',default='config')
+    args = parser.parse_args()
+    argsdict = vars(args)
+
+    print(argsdict)
+
     # load each config file and run the experiment
-    for config_file in glob.glob('config/' + "*.json"):
+    for config_file in glob.glob( os.path.join(argsdict['config_dir'],"*.json") ):
         print('main running config file %s'%config_file)
         config = json.loads(open(config_file, 'r').read())
         name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
