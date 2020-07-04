@@ -89,6 +89,9 @@ def get_model(config):
                            predict_distance=config['predict_distance'], predict_contour=config['predict_contour'],
                            aspp=config['aspp'])
 
+    def custom_loss(y_pred, y_true):
+        return tf.keras.losses.binary_crossentropy(y_true, y_pred) + y_pred*(1-y_pred)
+
     if config['predict_distance'] and config['predict_contour']:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'],
                       loss_weights=config['loss_weights'], metrics=['accuracy', kaggle_metric])
@@ -96,7 +99,7 @@ def get_model(config):
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0:2],
                       loss_weights=config['loss_weights'][0:2], metrics=['accuracy', kaggle_metric])
     elif config['predict_contour']:
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0:2],
+        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=[custom_loss, 'binary_crossentropy'],
                       loss_weights=config['loss_weights'][0:2], metrics=['accuracy', kaggle_metric])
     else:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0],
