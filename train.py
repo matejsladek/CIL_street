@@ -86,7 +86,8 @@ def get_model(config):
     model = PretrainedUnet(backbone_name=config['backbone'],
                            input_shape=(config['img_resize'], config['img_resize'], config['n_channels']),
                            encoder_weights=encoder_weights, encoder_freeze=False,
-                           predict_distance=config['predict_distance'], predict_contour=config['predict_contour'])
+                           predict_distance=config['predict_distance'], predict_contour=config['predict_contour'],
+                           aspp=config['aspp'])
 
     if config['predict_distance'] and config['predict_contour']:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'],

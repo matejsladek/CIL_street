@@ -12,7 +12,7 @@
   "predict_distance": false,
   "predict_contour": true,
   "batch_size": 4,
-  "epochs": 0,
+  "epochs": 150,
   "optimizer": "adam",
   "learning_rate": 0.0001,
   "loss": ["binary_crossentropy", "binary_crossentropy", "mse"],
@@ -27,5 +27,6 @@
   "buffer_size": 1000,
   "n_ensemble": 3,
   "hard_mask": true,
-  "stop_on_metric": true
+  "stop_on_metric": true,
+  "aspp": true
 }
