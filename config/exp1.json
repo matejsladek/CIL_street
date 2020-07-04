@@ -26,5 +26,6 @@
   "n_classes": 2,
   "buffer_size": 1000,
   "n_ensemble": 3,
-  "hard_mask": true
+  "hard_mask": true,
+  "stop_on_metric": true
 }
