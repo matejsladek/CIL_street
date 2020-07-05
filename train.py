@@ -54,7 +54,21 @@ def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
                                           predict_distance=config['predict_distance'])
     val_dataset = val_dataset.map(val_image_loader)
     val_dataset = val_dataset.batch(config['batch_size']).prefetch(buffer_size=autotune)
-    return train_dataset, val_dataset
+
+    val_dataset_copy = val_dataset
+    val_dataset_copy = list(val_dataset_copy)
+
+    if config['predict_contour'] or config['predict_distance']:
+        val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_copy])
+        val_dataset_numpy_y_mask = np.concatenate([b[0].numpy()[:, ...] for a,b in val_dataset_copy])
+        val_dataset_numpy_y_new_task = np.concatenate([b[1].numpy()[:, ...] for a,b in val_dataset_copy])
+        val_dataset_numpy_y = (val_dataset_numpy_y_mask, val_dataset_numpy_y_new_task)
+    else:
+        val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_copy])
+        val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_copy])
+    val_dataset_numpy = (val_dataset_numpy_x, val_dataset_numpy_y)
+
+    return train_dataset, val_dataset, val_dataset_numpy
 
 
 # produce datasets according to config
@@ -70,9 +84,9 @@ def get_dataset(config, autotune):
     trainset_size = len(training_data_glob)
     valset_size = len(val_data_glob)
 
-    train_dataset, val_dataset = get_dataset_from_path(training_data_glob, val_data_glob, config, autotune)
+    train_dataset, val_dataset, val_dataset_numpy = get_dataset_from_path(training_data_glob, val_data_glob, config, autotune)
 
-    return train_dataset, val_dataset, trainset_size, valset_size, training_data_root, val_data_root
+    return train_dataset, val_dataset, val_dataset_numpy, trainset_size, valset_size, training_data_root, val_data_root
 
 
 # build and compile the model
@@ -92,6 +106,9 @@ def get_model(config):
     def custom_loss(y_pred, y_true):
         return tf.keras.losses.binary_crossentropy(y_true, y_pred) + y_pred*(1-y_pred)
 
+    if config['augment_loss']:
+        config['loss'][0] = custom_loss
+
     if config['predict_distance'] and config['predict_contour']:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'],
                       loss_weights=config['loss_weights'], metrics=['accuracy', kaggle_metric])
@@ -99,22 +116,13 @@ def get_model(config):
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0:2],
                       loss_weights=config['loss_weights'][0:2], metrics=['accuracy', kaggle_metric])
     elif config['predict_contour']:
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=[custom_loss, 'binary_crossentropy'],
+        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0:2],
                       loss_weights=config['loss_weights'][0:2], metrics=['accuracy', kaggle_metric])
     else:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0],
                       metrics=['accuracy', kaggle_metric])
 
     return model
-
-
-# retrieve the postprocessing method according to config
-def get_postprocess(config):
-    if config['postprocess'] == 'morphological':
-        return morphological_postprocessing
-    elif config['postprocess'] == 'none':
-        return no_postprocessing
-    raise Exception('Unknown postprocessing')
 
 
 # create the model and train it, load weights from epoch with best val loss
@@ -135,10 +143,10 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
 
         def on_epoch_end(self, epoch, logs=None):
             ev = model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)
-            print('\nValidation metrics: ' + str(ev))
+            print('\nValidation metrics: ' + str(ev) + '\n')
             if ev[self.loss_index] < self.lowest_loss and not config['stop_on_metric']:
                 self.lowest_loss = ev[self.loss_index]
-                print('New lowest loss. Saving weights.')
+                print('\nNew lowest loss. Saving weights.\n')
                 model.save_weights(config['log_folder'] + '/best_model.h5')
 
             if ev[self.metric_index] > self.highest_metric and config['stop_on_metric']:
@@ -146,16 +154,24 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
                 print('New best metric. Saving weights.')
                 model.save_weights(config['log_folder'] + '/best_model.h5')
 
-    callbacks = [
-        tf.keras.callbacks.TensorBoard(config['log_folder'] + '/log'),
-        CustomCallback(),
-    ]
+    callbacks = [tf.keras.callbacks.TensorBoard(config['log_folder'] + '/log')]
+
+    if config['custom_callback']:
+        callbacks.append(CustomCallback())
+    else:
+        # only works with single task learning
+        callbacks.append(tf.keras.callbacks.ModelCheckpoint(config['log_folder'] + '/best_model.h5',
+                                                            monitor='val_kaggle_metric' and config['stop_on_metric'] or 'val_loss',
+                                                            verbose=1,
+                                                            save_best_only=True,
+                                                            save_weights_only=True))
 
     model_history = model.fit(train_dataset, epochs=config['epochs'],
                               steps_per_epoch=steps_per_epoch,
                               validation_data=val_dataset_original,
                               callbacks=callbacks)
-    if config['epochs']>0:
+
+    if config['epochs'] > 0:
         model.load_weights(config['log_folder'] + '/best_model.h5')
     return model
 
@@ -169,30 +185,18 @@ def run_experiment(config,prep_function):
     autotune = tf.data.experimental.AUTOTUNE
     prepare_gpus()
 
-    train_dataset, val_dataset, trainset_size, valset_size, training_data_root, val_data_root = prep_function(config,autotune)
-
-    # TODO: move to method
-    val_dataset_original = val_dataset
-    val_dataset_2 = list(val_dataset)
-
-    if config['predict_contour'] or config['predict_distance']:
-        val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_2])
-        val_dataset_numpy_y_mask = np.concatenate([b[0].numpy()[:, ...] for a,b in val_dataset_2])
-        val_dataset_numpy_y_new_task1 = np.concatenate([b[1].numpy()[:, ...] for a,b in val_dataset_2])
-        val_dataset_numpy_y = (val_dataset_numpy_y_mask, val_dataset_numpy_y_new_task1)
-    else:
-        val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_2])
-        val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_2])
-    val_dataset_numpy = (val_dataset_numpy_x, val_dataset_numpy_y)
+    train_dataset, val_dataset, val_dataset_numpy,\
+    trainset_size, valset_size, training_data_root, val_data_root = prep_function(config,autotune)
+    val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
 
     print(f"Training dataset contains {trainset_size} images.")
     print(f"Validation dataset contains {valset_size} images.")
     steps_per_epoch = max(trainset_size // config['batch_size'], 1)
 
     print('Begin training')
-    model = create_and_train_model(train_dataset, val_dataset_original, val_dataset_numpy, steps_per_epoch, config)
+    model = create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_per_epoch, config)
 
-    postprocess = get_postprocess(config)
+    postprocess = get_postprocess(config['postprocess'])
 
     print('Saving validation scores')
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")

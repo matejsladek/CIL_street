@@ -15,6 +15,7 @@ from code.metrics import *
 import json
 
 
+# enable memory growth and detects gpus
 def prepare_gpus():
     print(f"Tensorflow ver. {tf.__version__}")
     gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -28,17 +29,11 @@ def prepare_gpus():
             print(e)
 
 
-def get_dataset(config, autotune):
-    if config['dataset'] == 'original':
-        training_data = "data/original/training/images/"
-    else:
-        raise Exception('Unrecognised dataset')
-    val_data = training_data.replace('training', 'validation')
-    trainset_size = len(glob.glob(training_data + "*.png"))
-    valset_size = len(glob.glob(val_data + "*.png"))
-
-    train_dataset = tf.data.Dataset.list_files(training_data + "*.png", seed=config['seed'])
-    train_dataset = train_dataset.map(parse_image)
+# retrieve tf.Datasets from globs of images paths, applies preprocessing
+def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
+    # can use from_tensor_slices to speed up
+    train_dataset = tf.data.Dataset.list_files(training_data_glob, seed=config['seed'])
+    train_dataset = train_dataset.map(get_parse_image(hard=config['hard_mask']))
     train_image_loader = get_load_image_train(size=config['img_resize'],
                                               normalize=config['normalize'],
                                               h_flip=config['h_flip'],
@@ -52,28 +47,67 @@ def get_dataset(config, autotune):
     train_dataset = train_dataset.repeat().shuffle(buffer_size=config['buffer_size'], seed=config['seed'])\
         .batch(config['batch_size']).prefetch(buffer_size=autotune)
 
-    val_dataset = tf.data.Dataset.list_files(val_data + "*.png", seed=config['seed'])
-    val_dataset = val_dataset.map(parse_image)
+    val_dataset = tf.data.Dataset.list_files(val_data_glob, shuffle=False, seed=config['seed'])
+    val_dataset = val_dataset.map(get_parse_image(hard=config['hard_mask']))
     val_image_loader = get_load_image_val(size=config['img_resize'], normalize=config['normalize'],
                                           predict_contour=config['predict_contour'],
                                           predict_distance=config['predict_distance'])
     val_dataset = val_dataset.map(val_image_loader)
-    val_dataset = val_dataset.repeat().batch(config['batch_size']).prefetch(buffer_size=autotune)
+    val_dataset = val_dataset.batch(config['batch_size']).prefetch(buffer_size=autotune)
 
-    return train_dataset, val_dataset, trainset_size, valset_size, training_data, val_data
+    val_dataset_copy = val_dataset
+    val_dataset_copy = list(val_dataset_copy)
+
+    if config['predict_contour'] or config['predict_distance']:
+        val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_copy])
+        val_dataset_numpy_y_mask = np.concatenate([b[0].numpy()[:, ...] for a,b in val_dataset_copy])
+        val_dataset_numpy_y_new_task = np.concatenate([b[1].numpy()[:, ...] for a,b in val_dataset_copy])
+        val_dataset_numpy_y = (val_dataset_numpy_y_mask, val_dataset_numpy_y_new_task)
+    else:
+        val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_copy])
+        val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_copy])
+    val_dataset_numpy = (val_dataset_numpy_x, val_dataset_numpy_y)
+
+    return train_dataset, val_dataset, val_dataset_numpy
 
 
+# produce datasets according to config
+def get_dataset(config, autotune):
+    if config['dataset'] == 'original':
+        training_data_root = "data/original/training/images/"
+    else:
+        raise Exception('Unrecognised dataset')
+    val_data_root = training_data_root.replace('training', 'validation')
+
+    training_data_glob = glob.glob(training_data_root + "*.png")
+    val_data_glob = glob.glob(val_data_root + "*.png")
+    trainset_size = len(training_data_glob)
+    valset_size = len(val_data_glob)
+
+    train_dataset, val_dataset, val_dataset_numpy = get_dataset_from_path(training_data_glob, val_data_glob, config, autotune)
+
+    return train_dataset, val_dataset, val_dataset_numpy, trainset_size, valset_size, training_data_root, val_data_root
+
+
+# build and compile the model
 def get_model(config):
-    backbone = config['backbone']
     learning_rate = config['learning_rate']
+
     encoder_weights = None
     if config['pretrained']:
         encoder_weights = 'imagenet'
 
-    model = PretrainedUnet(backbone_name=backbone,
+    model = PretrainedUnet(backbone_name=config['backbone'],
                            input_shape=(config['img_resize'], config['img_resize'], config['n_channels']),
                            encoder_weights=encoder_weights, encoder_freeze=False,
-                           predict_distance=config['predict_distance'], predict_contour=config['predict_contour'])
+                           predict_distance=config['predict_distance'], predict_contour=config['predict_contour'],
+                           aspp=config['aspp'])
+
+    def custom_loss(y_pred, y_true):
+        return tf.keras.losses.binary_crossentropy(y_true, y_pred) + y_pred*(1-y_pred)
+
+    if config['augment_loss']:
+        config['loss'][0] = custom_loss
 
     if config['predict_distance'] and config['predict_contour']:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'],
@@ -91,180 +125,175 @@ def get_model(config):
     return model
 
 
-def get_postprocess(config):
-    if config['postprocess'] == 'morphological':
-        return morphological_postprocessing
-    elif config['postprocess'] == 'none':
-        return no_postprocessing
-    raise Exception('Unknown postprocessing')
+# create the model and train it, load weights from epoch with best val loss
+def create_and_train_model(train_dataset, val_dataset_original, val_dataset_numpy, steps_per_epoch, config):
+    model = get_model(config)
+    val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
+
+    class CustomCallback(tf.keras.callbacks.Callback):
+        def __init__(self):
+            super(CustomCallback, self).__init__()
+            self.lowest_loss = 100
+            self.highest_metric = 0
+            self.metric_index = 2
+            self.loss_index = 0
+            if config['predict_contour'] or config['predict_distance']:
+                self.metric_index = -3
+                self.loss_index = 1
+
+        def on_epoch_end(self, epoch, logs=None):
+            ev = model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)
+            print('\nValidation metrics: ' + str(ev) + '\n')
+            if ev[self.loss_index] < self.lowest_loss and not config['stop_on_metric']:
+                self.lowest_loss = ev[self.loss_index]
+                print('\nNew lowest loss. Saving weights.\n')
+                model.save_weights(config['log_folder'] + '/best_model.h5')
+
+            if ev[self.metric_index] > self.highest_metric and config['stop_on_metric']:
+                self.highest_metric = ev[self.metric_index]
+                print('New best metric. Saving weights.')
+                model.save_weights(config['log_folder'] + '/best_model.h5')
+
+    callbacks = [tf.keras.callbacks.TensorBoard(config['log_folder'] + '/log')]
+
+    if config['custom_callback']:
+        callbacks.append(CustomCallback())
+    else:
+        # only works with single task learning
+        callbacks.append(tf.keras.callbacks.ModelCheckpoint(config['log_folder'] + '/best_model.h5',
+                                                            monitor='val_kaggle_metric' and config['stop_on_metric'] or 'val_loss',
+                                                            verbose=1,
+                                                            save_best_only=True,
+                                                            save_weights_only=True))
+
+    model_history = model.fit(train_dataset, epochs=config['epochs'],
+                              steps_per_epoch=steps_per_epoch,
+                              validation_data=val_dataset_original,
+                              callbacks=callbacks)
+
+    if config['epochs'] > 0:
+        model.load_weights(config['log_folder'] + '/best_model.h5')
+    return model
 
 
-def compute_metric(metric, in_path, gt_path):
-    img_paths = glob.glob(in_path + '/*.png')
-    images = []
-    for img_path in img_paths:
-        images.append(cv2.imread(img_path, 0)/255.0)
-    images = np.stack(images, axis=0)
-
-    gt_paths = glob.glob(gt_path + '/*.png')
-    gt = []
-    for gt_path in gt_paths:
-        gt.append(cv2.imread(gt_path, 0)/255.0)
-    gt = np.stack(gt, axis=0)
-
-    return metric(gt, images)
+def prep_experiment(config,autotune):
+    print('Load dataset')
+    return get_dataset(config, autotune)
 
 
-def save_predictions_ensemble(model, model_paths, model_size, output_size, normalize, crop, input_path, output_path, config):
+def bag(in_path, out_path, config):
+    images = {}
+    name = {}
+    print(in_path)
+    print(out_path)
+    print(glob.glob(in_path + '0/*.png'))
+    for img in glob.glob(in_path + '0/*.png'):
+        print(img)
+        images[img[-7:]] = []
+        name[img[-7:]] = img[len(in_path)+1:]
 
-    test_list = os.listdir(input_path)
-    test_list.sort()
+    for i in range(config['n_ensemble']):
+        print(i)
+        for img in glob.glob(in_path + str(i) + '/*.png'):
+            print(img)
+            images[img[-7:]].append(cv2.imread(img, 0))
 
-    output_list = {}
-    for image_path in test_list:
-        output_list[image_path] = []
-
-    for model_path in model_paths:
-        model.load_weights(model_path)
-        model = get_model(config)
-        for image_path in test_list:
-            if crop:
-                image = np.array(Image.open(os.path.join(input_path, image_path)))
-                img_parts = [image[:400, :400, :], image[:400, -400:, :], image[-400:, :400, :], image[-400:, -400:, :]]
-                out_parts = []
-                for img in img_parts:
-                    resized_img = np.array(Image.fromarray(img).resize((model_size,model_size)))
-                    resized_img = np.expand_dims(resized_img, 0)
-                    if normalize:
-                        resized_img = resized_img/255.0
-                    if config['predict_contour'] or config['predict_distance']:
-                        output = model.predict(resized_img)[0][0]
-                    else:
-                        output = model.predict(resized_img)[0]
-                    if normalize:
-                        output = output * 255.0
-                    out_parts.append(np.array(tf.keras.preprocessing.image.array_to_img(output).resize((400, 400))))
-
-                output = np.zeros((608, 608))
-                output[:304, :304] = out_parts[0][:304, :304]
-                output[:304, -304:] = out_parts[1][:304, -304:]
-                output[-304:, :304] = out_parts[2][-304:, :304]
-                output[-304:, -304:] = out_parts[3][-304:, -304:]
-                output = np.expand_dims(output, -1)
-            else:
-                image = np.array(Image.open(os.path.join(input_path, image_path)).resize((model_size, model_size)))
-                image = np.expand_dims(image, 0)
-                if normalize:
-                    image = image/255.0
-
-                if config['predict_contour'] or config['predict_distance']:
-                    output = model.predict(image)[0][0]
-                else:
-                    output = model.predict(image)[0]
-                if normalize:
-                    output = output * 255.0
-
-            output = output.astype(np.uint8)
-            output_list[image_path].append(output.copy())
-
-    for image_path in test_list:
-        output = np.stack(output_list[image_path], axis=0)
-        output = np.mean(output, axis=0)
-        output_img = tf.keras.preprocessing.image.array_to_img(output).resize((output_size, output_size))
-        output_img.save(output_path + '/' + image_path)
+    for img in glob.glob(in_path + '0/*.png'):
+        arr = images[img[-7:]]
+        arr = np.array(arr)
+        m = np.mean(arr, axis=0)
+        m[m < config['bagging_threshold']] = 0
+        print(name[img[-7:]])
+        cv2.imwrite(out_path + '/' + name[img[-7:]], m)
 
 
-def run_experiment(config):
+def run_experiment(config,prep_function):
 
-    autotune = tf.data.experimental.AUTOTUNE
-    prepare_gpus()
-
-    saved_models = []
-    for i in range(config["n_ensemble"]):
-        train_dataset, val_dataset, trainset_size, valset_size, training_data, val_data = get_dataset(config, autotune)
-
-        print(f"Training dataset contains {trainset_size} images.")
-        print(f"Validation dataset contains {valset_size} images.")
+    for i in range(config['n_ensemble']):
+        autotune = tf.data.experimental.AUTOTUNE
+        prepare_gpus()
+        train_dataset, val_dataset, val_dataset_numpy, \
+        trainset_size, valset_size, training_data_root, val_data_root = prep_function(config, autotune)
+        val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
         steps_per_epoch = max(trainset_size // config['batch_size'], 1)
-        validation_steps = max(valset_size // config['batch_size'], 1)
+        print('Begin training for ' + config['name'] + '/' + str(i))
+        model = create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_per_epoch, config)
 
-        model = get_model(config)
+        in_test_path = 'data/test_images'
+        pred_test_path = os.path.join(config['log_folder'], "pred_test") + str(i)
+        os.mkdir(pred_test_path)
+        in_val_path = val_data_root
+        pred_val_path = os.path.join(config['log_folder'], "pred_val") + str(i)
+        os.mkdir(pred_val_path)
 
-        monitor_metric = 'val_loss'
-        if config['predict_contour'] or config['predict_distance']:
-            monitor_metric = 'val_final_activation_mask_loss'
-        callbacks = [
-            tf.keras.callbacks.ModelCheckpoint(config['log_folder'] + 
-'/best_model' + str(i) + '.h5', monitor=monitor_metric, verbose=1, 
-save_best_only=True, save_weights_only=True),
-            tf.keras.callbacks.TensorBoard(config['log_folder'] + '/log'),
-        ]
+        print('Saving predictions')
+        save_predictions(model=model,
+                         crop=True,
+                         input_path=in_test_path,
+                         output_path=pred_test_path,
+                         postprocessed_output_path=None,
+                         config=config,
+                         postprocess=None)
+        save_predictions(model=model,
+                         crop=False,
+                         input_path=in_val_path,
+                         output_path=pred_val_path,
+                         postprocessed_output_path=None,
+                         config=config,
+                         postprocess=None)
 
-        print('Begin training for ' + config['name'])
-        model_history = model.fit(train_dataset, epochs=config['epochs'],
-                                  steps_per_epoch=steps_per_epoch,
-                                  validation_steps=validation_steps,
-                                  validation_data=val_dataset,
-                                  callbacks=callbacks)
+        del model
+        print('Finished ' + config['name'] + '/' + str(i))
+        config['seed'] += 1
 
-        saved_models.append(config['log_folder'] + '/best_model' + str(i) + '.h5')
+    pred_test_ensemble_path = os.path.join(config['log_folder'], "pred_test_ensemble")
+    os.mkdir(pred_test_ensemble_path)
+    pred_val_ensemble_path = os.path.join(config['log_folder'], "pred_val_ensemble")
+    os.mkdir(pred_val_ensemble_path)
 
-    postprocess = get_postprocess(config)
+    bag(os.path.join(config['log_folder'], "pred_val"), pred_val_ensemble_path, config)
+    bag(os.path.join(config['log_folder'], "pred_test"), pred_test_ensemble_path, config)
 
-    in_val_path = val_data
-    gt_val_path = val_data.replace('images', 'groundtruth')
-    pred_val_path = os.path.join(config['log_folder'], "pred_val")
-    os.mkdir(pred_val_path)
-    postprocess_val_path = os.path.join(config['log_folder'], "postprocess_val")
-    os.mkdir(postprocess_val_path)
-
-    in_test_path = 'data/test_images'
-    pred_test_path = os.path.join(config['log_folder'], "pred_test")
-    os.mkdir(pred_test_path)
-    postprocess_test_path = os.path.join(config['log_folder'], "postprocess_test")
-    os.mkdir(postprocess_test_path)
-
-    print('Begin validation for ' + config['name'])
-    save_predictions_ensemble(model=model,
-                              model_paths=saved_models,
-                              model_size=config['img_resize'],
-                              output_size=config['img_size'],
-                              normalize=config['normalize'],
-                              crop=False,
-                              input_path=in_val_path,
-                              output_path=pred_val_path,
-                              config=config)
+    postprocess = get_postprocess(config['postprocess'])
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")
-    out_file.write("Validation loss during training (min):\n" + 
-str(np.min(model_history.history[monitor_metric]))+'\n')
-    out_file.write("Validation before post processing:\n")
-    val_score = compute_metric(np_kaggle_metric, pred_val_path, gt_val_path)
-    out_file.write(str(val_score) + "\nValidation after post processing:\n")
-    postprocess(pred_val_path, postprocess_val_path)
-    val_score = compute_metric(np_kaggle_metric, postprocess_val_path, gt_val_path)
-    out_file.write(str(val_score) + '\n')
+    out_file.write("Validation results\n")
+    out_file.write("\nKaggle metric on predictions: \n")
+
+    val_predictions = []
+    for img in glob.glob(pred_val_ensemble_path + '/*.png'):
+        val_predictions.append(cv2.imread(img, 0))
+    val_predictions = np.array(val_predictions)
+    if config['normalize']:
+        val_predictions = np.where(val_predictions > 128, 1, 0)
+    val_predictions = np.expand_dims(val_predictions, axis=-1).astype(np.uint8)
+
+    out_file.write(str(kaggle_metric(val_predictions, val_dataset_numpy_y)))
+    out_file.write("\nKaggle metric on predictions after post processing: \n")
+    val_postprocessed_predictions = postprocess(val_predictions)
+    out_file.write(str(kaggle_metric(val_postprocessed_predictions, val_dataset_numpy_y)))
+    out_file.write('\n')
     out_file.close()
 
-    print('Begin test for ' + config['name'])
-    save_predictions_ensemble(model=model,
-                              model_paths=saved_models,
-                              model_size=config['img_resize'],
-                              output_size=config['img_size_test'],
-                              normalize=config['normalize'],
-                              crop=True,
-                              input_path=in_test_path,
-                              output_path=pred_test_path,
-                              config=config)
-    to_csv(pred_test_path, os.path.join(config['log_folder'], 'pred_submission.csv'))
-    postprocess(pred_test_path, postprocess_test_path)
-    to_csv(postprocess_test_path, os.path.join(config['log_folder'],'postprocess_submission.csv'))
+    postprocess_test_ensemble_path = os.path.join(config['log_folder'], "postprocess_test_ensemble")
+    os.mkdir(postprocess_test_ensemble_path)
 
-    print('Finished ' + config['name'])
+    for img in glob.glob(pred_test_ensemble_path + '/*.png'):
+        im = cv2.imread(img, 0)
+        if config['normalize']:
+            im = np.where(im > 128, 1, 0)
+        im = np.expand_dims(im, axis=-1).astype(np.uint8)
+        im = postprocess(im)
+        cv2.imwrite(postprocess_test_ensemble_path + im[len(pred_test_ensemble_path)+1:], im)
+
+    to_csv(pred_test_ensemble_path, os.path.join(config['log_folder'], 'pred_submission.csv'))
+    to_csv(postprocess_test_ensemble_path, os.path.join(config['log_folder'], 'postprocess_submission.csv'))
+
 
 if __name__ == '__main__':
+    # load each config file and run the experiment
     for config_file in glob.glob('config/' + "*.json"):
         config = json.loads(open(config_file, 'r').read())
         name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
         config['log_folder'] = 'experiments/'+name
-        os.mkdir(config['log_folder'])
-        run_experiment(config)
+        os.makedirs(config['log_folder'])
+        run_experiment(config,prep_experiment)

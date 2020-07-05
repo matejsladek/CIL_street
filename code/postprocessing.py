@@ -16,6 +16,14 @@ BM_IN_AREA_PREC_THRESHOLD = 0.25
 IMG_TYPE = 'png'
 
 
+def get_postprocess(name):
+    if name == 'morphological':
+        return morphological_postprocessing
+    elif name == 'none':
+        return no_postprocessing
+    raise Exception('Unknown postprocessing')
+
+
 def no_postprocessing(imgs):
     return imgs
 

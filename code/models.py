@@ -33,59 +33,54 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
         b0 = Lambda(lambda x : tf.image.resize(x, (12, 12)))(b0)
 
         b1 = Conv2D(256, 1, padding='same', dilation_rate=(1, 1), kernel_initializer='he_normal', name='aspp_b1_conv')(x)
-        b1 = tf.keras.layers.BatchNormalization(axis=3, name='aspp_b1_bn')(b1)
-        b1 = tf.keras.layers.Activation('relu', name='aspp_b1_relu')(b1)
+        b1 = BatchNormalization(axis=3, name='aspp_b1_bn')(b1)
+        b1 = Activation('relu', name='aspp_b1_relu')(b1)
         b2 = Conv2D(256, 3, padding='same', dilation_rate=(3, 3), kernel_initializer='he_normal', name='aspp_b2_conv')(x)
-        b2 = tf.keras.layers.BatchNormalization(axis=3, name='aspp_b2_bn')(b2)
-        b2 = tf.keras.layers.Activation('relu', name='aspp_b2_relu')(b2)
+        b2 = BatchNormalization(axis=3, name='aspp_b2_bn')(b2)
+        b2 = Activation('relu', name='aspp_b2_relu')(b2)
         b3 = Conv2D(256, 3, padding='same', dilation_rate=(6, 6), kernel_initializer='he_normal', name='aspp_b3_conv')(x)
-        b3 = tf.keras.layers.BatchNormalization(axis=3, name='aspp_b3_bn')(b3)
-        b3 = tf.keras.layers.Activation('relu', name='aspp_b3_relu')(b3)
+        b3 = BatchNormalization(axis=3, name='aspp_b3_bn')(b3)
+        b3 = Activation('relu', name='aspp_b3_relu')(b3)
 
-        x = tf.keras.layers.Concatenate(axis=3, name='aspp_concat')([b0, b1, b2, b3])
-        x = tf.keras.layers.Conv2D(256, (1, 1), padding='same', use_bias=False, name='aspp_concat_conv')(x)
-        x = tf.keras.layers.BatchNormalization(axis=3, name='aspp_concat_bn')(x)
-        x = tf.keras.layers.Activation('relu', name='aspp_concat_relu')(x)
+        x = Concatenate(axis=3, name='aspp_concat')([b0, b1, b2, b3])
+        x = Conv2D(256, (1, 1), padding='same', use_bias=False, name='aspp_concat_conv')(x)
+        x = BatchNormalization(axis=3, name='aspp_concat_bn')(x)
+        x = Activation('relu', name='aspp_concat_relu')(x)
 
     for i in range(n_blocks):
 
         filters = decoder_filters[i]
 
-        x = tf.keras.layers.UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(x)
+        x = UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(x)
         if i < len(skips):
-            x = tf.keras.layers.Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([x, skips[i]])
+            x = Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([x, skips[i]])
 
-        x = tf.keras.layers.Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(x)
-        x = tf.keras.layers.BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
-        x = tf.keras.layers.Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
+        x = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(x)
+        x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
+        x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
 
-        x = tf.keras.layers.Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
-        x = tf.keras.layers.BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
-        x = tf.keras.layers.Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
+        x = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
+        x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
+        x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
+
+    task1 = Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_mask')(x)
+    task1 = Activation('sigmoid', name='final_activation_mask')(task1)
+
+    if predict_contour:
+        task2 = Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_contour')(x)
+        task2 = Activation('sigmoid', name='final_activation_contour')(task2)
+    if predict_distance:
+        task3 = Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_distance')(x)
+        task3 = Activation('linear', name='final_activation_distance')(task3)
 
     if predict_contour and predict_distance:
-        task1 = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_mask')(x)
-        task1 = tf.keras.layers.Activation('sigmoid', name='final_activation_mask')(task1)
-        task2 = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_contour')(x)
-        task2 = tf.keras.layers.Activation('sigmoid', name='final_activation_contour')(task2)
-        task3 = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_distance')(x)
-        task3 = tf.keras.layers.Activation('linear', name='final_activation_distance')(task3)
         output = [task1, task2, task3]
     elif predict_contour:
-        task1 = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_mask')(x)
-        task1 = tf.keras.layers.Activation('sigmoid', name='final_activation_mask')(task1)
-        task2 = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_contour')(x)
-        task2 = tf.keras.layers.Activation('sigmoid', name='final_activation_contour')(task2)
         output = [task1, task2]
     elif predict_distance:
-        task1 = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_mask')(x)
-        task1 = tf.keras.layers.Activation('sigmoid', name='final_activation_mask')(task1)
-        task2 = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_distance')(x)
-        task2 = tf.keras.layers.Activation('linear', name='final_activation_distance')(task2)
-        output = [task1, task2]
+        output = [task1, task3]
     else:
-        x = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv')(x)
-        output = tf.keras.layers.Activation('sigmoid', name='final_activation')(x)
+        output = task1
 
     model = tf.keras.models.Model(backbone.input, output)
 

@@ -9,31 +9,6 @@ import matplotlib.image as mpimg
 import re
 import glob
 
-
-def display_sample(display_list):
-    '''
-    plt.figure(figsize=(18, 18))
-
-    title = ['Input Image', 'True Mask', 'Predicted Mask']
-
-    for i in range(len(display_list)):
-        plt.subplot(1, len(display_list), i+1)
-        plt.title(title[i])
-        plt.imshow(tf.keras.preprocessing.image.array_to_img(display_list[i]))
-        plt.axis('off')
-    plt.show()
-    '''
-    pass
-
-
-def show_predictions(model=None, dataset=None, num=1):
-    """Show a sample prediction.
-    """
-    for image, mask in dataset.take(num):
-        pred_mask = model.predict(np.array(image))
-        display_sample([image[0], mask[0], pred_mask[0]])
-
-
 def save_predictions(model, crop, input_path, output_path, postprocessed_output_path, config, postprocess=None):
     model_size = config['img_resize'],
     output_size = config['img_size_test'],
@@ -93,7 +68,7 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
         image_name = os.path.basename(image_path)
         output_img.save(output_path + '/' + image_name)
         if postprocess is None:
-            return
+            continue
         postprocessed_output = np.squeeze(postprocess(np.expand_dims(output, 0)), axis=0)
         postprocessed_output_img = tf.keras.preprocessing.image.array_to_img(postprocessed_output).resize((608, 608))
         postprocessed_output_img.save(postprocessed_output_path + '/' + image_name)
