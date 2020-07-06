@@ -4,7 +4,7 @@ from classification_models.tfkeras import Classifiers
 
 
 def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_weights='imagenet',
-                   encoder_freeze=False, predict_distance=False, predict_contour=False, aspp=False):
+                   encoder_freeze=False, predict_distance=False, predict_contour=False, aspp=False, se=False):
 
     decoder_filters=(256, 128, 64, 32, 16)
     n_blocks=len(decoder_filters)
@@ -59,9 +59,21 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
         x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
         x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
 
+        if se:
+            w = GlobalAveragePooling2D(name='decoder_stage{}a_se_avgpool'.format(i))(x)
+            w = Dense(filters // 8, activation='relu', name='decoder_stage{}a_se_dense1'.format(i))(w)
+            w = Dense(filters, activation='sigmoid', name='decoder_stage{}a_se_dense2'.format(i))(w)
+            x = Multiply(name='decoder_stage{}a_se_mult'.format(i))([x, w])
+
         x = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False, kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
         x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
         x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
+
+        if se:
+            w = GlobalAveragePooling2D(name='decoder_stage{}b_se_avgpool'.format(i))(x)
+            w = Dense(filters // 8, activation='relu', name='decoder_stage{}b_se_dense1'.format(i))(w)
+            w = Dense(filters, activation='sigmoid', name='decoder_stage{}b_se_dense2'.format(i))(w)
+            x = Multiply(name='decoder_stage{}b_se_mult'.format(i))([x, w])
 
     task1 = Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_mask')(x)
     task1 = Activation('sigmoid', name='final_activation_mask')(task1)

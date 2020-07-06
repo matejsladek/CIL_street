@@ -31,5 +31,6 @@
   "aspp": false,
   "augment_loss": false,
   "custom_callback": true,
-  "bagging_threshold": 90
+  "bagging_threshold": 90,
+  "se": true
 }

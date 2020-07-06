@@ -101,7 +101,7 @@ def get_model(config):
                            input_shape=(config['img_resize'], config['img_resize'], config['n_channels']),
                            encoder_weights=encoder_weights, encoder_freeze=False,
                            predict_distance=config['predict_distance'], predict_contour=config['predict_contour'],
-                           aspp=config['aspp'])
+                           aspp=config['aspp'], se=config['se'])
 
     def custom_loss(y_pred, y_true):
         return tf.keras.losses.binary_crossentropy(y_true, y_pred) + y_pred*(1-y_pred)
