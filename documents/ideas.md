@@ -91,21 +91,22 @@
 - [Best performing notebook from June 22](https://colab.research.google.com/drive/12BbjdJz_upR8Q2Ta5bCH24lO0844VcnB?usp=sharing) (after dropping the library model)
 
 # Reporting and Experiments
-- Papers for reference: Henry 2018,
+- Papers for reference: 
+    - Road Seg Specific: Henry 2018, 
 - Training
     - Tensorflow version, GPU type, single (vs parallel)
     - Hyperparameter table
     - Rough convergence time
 - Metrics
     - Main: IoU, precision, recall
-          - Commonly used metrics in literature are meaningful: facilitate comparison
+        Commonly used metrics in literature are meaningful: facilitate comparison
     - Others: F1
     - Cross validated above
     - 1 or 2 Metrics tables with most important diffs
     - Comment: accuracy is not illustrative
 
 - Experiments
-    - Preprocess vs no preprocess
+    - Preprocess vs no preprocess (a baseline)
     
 
 # COMMENTS
