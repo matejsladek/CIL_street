@@ -87,9 +87,9 @@ def get_dataset_cv(config, autotune):
 
     print(trainset_size)
     print(valset_size)
-    train_dataset, val_dataset = get_dataset_from_path(training_data_glob, val_data_glob, config, autotune)
+    train_dataset, val_dataset, val_dataset_numpy = get_dataset_from_path(training_data_glob, val_data_glob, config, autotune)
 
-    return train_dataset, val_dataset, trainset_size, valset_size, training_data_root, val_data_root
+    return train_dataset, val_dataset, val_dataset_numpy, trainset_size, valset_size, training_data_root, val_data_root
 
 
 def prep_experiment_cv(config,autotune):
