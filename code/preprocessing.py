@@ -46,8 +46,10 @@ def get_load_image_train(size=400, normalize=True, h_flip=0.5, v_flip=0.5, rot=0
             input_image = tf.image.rot90(input_image, 3)
             input_mask = tf.image.rot90(input_mask, 3)
 
-        input_image = tf.image.random_contrast(input_image, 1-contrast, 1+contrast)
-        input_image = tf.image.random_brightness(input_image, brightness)
+        if contrast > 0:
+            input_image = tf.image.random_contrast(input_image, 1-contrast, 1+contrast)
+        if brightness > 0:
+            input_image = tf.image.random_brightness(input_image, brightness)
 
         if normalize:
             input_image = tf.cast(input_image, tf.float32) / 255.0
