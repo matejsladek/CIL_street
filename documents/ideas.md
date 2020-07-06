@@ -92,25 +92,33 @@
 
 # Reporting and Experiments
 - Papers for reference: 
-    - Road Seg Specific: Henry 2018, 
+    - Road Seg Specific: Henry 2018, Hinton&Mnih
 - Training
     - Tensorflow version, GPU type, single (vs parallel)
     - Hyperparameter table
     - Rough convergence time
 - Metrics
-    - Main: IoU, precision, recall
-        Commonly used metrics in literature are meaningful: facilitate comparison
-    - Others: F1
-    - Cross validated above
-    - 1 or 2 Metrics tables with most important diffs
+    - Main: IoU/Jaccard index, precision, recall (Commonly used metrics in literature are meaningful: facilitate comparison)
+    - Others: F1, Dice coef, Hausdorff distance, sensitivity, specificity
+    - Cross validated above: k=5,
+    - Hinton&Mnih: PR curve with buffer/patches- standard protocol
     - Comment: accuracy is not illustrative
 
-- Experiments
-    - Preprocess vs no preprocess (a baseline)
-    
 - Metrics to report (according to Marco):
 	- from 5 fold CV: Accuracy, F1 score, patch-wise accuracy
 	- public test score on kaggle
+
+- Experiments
+    - Preprocess vs no preprocess (baseline) (Report IoU)
+    - original 90 vs original 90 + chicago 1800 (baseline) (Report IoU)
+    - Proceed with one combination: e.g. preprocess + original 90 + chicago 1800
+    - Briefly: Postprocess vs no postprocess
+    
+    - Discuss effect of changing: domain specific HPs, algo HPs
+
+    - Hyperparameter tuning using CV
+    - Threshold selection using PR curve
+    - Use CVed loss vs epochs plot to justify epochs trained, plot minimum as rigourous convergence measure
 
 - Models for comparison:
 	- Baseline #1 from programming exercises
@@ -131,6 +139,9 @@ Open questions:
 	- how many networks in the ensemble?
 	- what parameters for random brightness/contrast?
     
+A:
+        - Loss weight tuning: 1,2/1,2,4,8 for each (see Henry 2018 table)
+	- Morphological PP param: tune using PR curve?
 
 # COMMENTS
 - test data has lots of parkings
