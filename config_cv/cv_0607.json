@@ -1,6 +1,6 @@
 {
   "name": "experiment_cv_dev",
-  "dataset": "original_all",
+  "dataset": "maps1800_all",
   "img_resize": 384,
   "v_flip": 0.5,
   "h_flip": 0.5,

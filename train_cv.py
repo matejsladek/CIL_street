@@ -101,23 +101,30 @@ def prep_experiment_cv(config,autotune):
 
 
 def cv_setup(config):
-        training_data_root = "data/original/all/images/"
-        training_data_glob = glob.glob(training_data_root + "*.png")
-        trainset_size = len(training_data_glob)
 
-        train_shuffled_idx = np.arange(trainset_size)
-        random.seed(config['seed'])
-        random.shuffle(train_shuffled_idx)
-        print(config)
-        print(type(config))
-        config['tmp'] = {}
-        config['tmp']['cv_shuffled_idxs'] = train_shuffled_idx
-        config['tmp']['cv_k_done'] = 0
-        config['tmp']['top_log_folder'] = config['log_folder']
-        config['tmp']['tmp_cv_data_folder'] = 'data/tmp_cv'
-        print(config['tmp'])
+    if config['dataset'] == 'original_all':
+        all_data_root = "data/original/all/images/"
+    elif config['dataset'] == 'maps1800_all':
+        all_data_root = "data/maps1800/all/images/"
+    else:
+        raise Exception('Unrecognised dataset')
 
-        return(config)
+    all_data_glob = glob.glob(all_data_root + "*.png")
+    allset_size = len(all_data_glob)
+    
+    all_shuffled_idx = np.arange(allset_size)
+    random.seed(config['seed'])
+    random.shuffle(all_shuffled_idx)
+    print(config)
+    print(type(config))
+    config['tmp'] = {}
+    config['tmp']['cv_shuffled_idxs'] = all_shuffled_idx
+    config['tmp']['cv_k_done'] = 0
+    config['tmp']['top_log_folder'] = config['log_folder']
+    config['tmp']['tmp_cv_data_folder'] = 'data/tmp_cv'
+    print(config['tmp'])
+    
+    return(config)
 
 
 def run_experiment_cv(config,prep_function):
