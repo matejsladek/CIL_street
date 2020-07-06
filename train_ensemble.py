@@ -281,9 +281,11 @@ def run_experiment(config,prep_function):
         im = cv2.imread(img, 0)
         if config['normalize']:
             im = np.where(im > 128, 1, 0)
-        im = np.expand_dims(im, axis=-1).astype(np.uint8)
+        im = im.astype(np.uint8)
         im = postprocess(im)
-        cv2.imwrite(postprocess_test_ensemble_path + im[len(pred_test_ensemble_path)+1:], im)
+        im = np.squeeze(im, -1)
+        out_path = postprocess_test_ensemble_path + img[len(pred_test_ensemble_path):]
+        cv2.imwrite(out_path, im)
 
     to_csv(pred_test_ensemble_path, os.path.join(config['log_folder'], 'pred_submission.csv'))
     to_csv(postprocess_test_ensemble_path, os.path.join(config['log_folder'], 'postprocess_submission.csv'))
