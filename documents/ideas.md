@@ -90,6 +90,25 @@
 - [Best performing notebook from June 18](https://colab.research.google.com/drive/1n9rgCBDHuTttykR5Fz6JNRiEO253iIu2?usp=sharing) (after some tuning)
 - [Best performing notebook from June 22](https://colab.research.google.com/drive/12BbjdJz_upR8Q2Ta5bCH24lO0844VcnB?usp=sharing) (after dropping the library model)
 
+# Reporting and Experiments
+- Papers for reference: 
+    - Road Seg Specific: Henry 2018, 
+- Training
+    - Tensorflow version, GPU type, single (vs parallel)
+    - Hyperparameter table
+    - Rough convergence time
+- Metrics
+    - Main: IoU, precision, recall
+        Commonly used metrics in literature are meaningful: facilitate comparison
+    - Others: F1
+    - Cross validated above
+    - 1 or 2 Metrics tables with most important diffs
+    - Comment: accuracy is not illustrative
+
+- Experiments
+    - Preprocess vs no preprocess (a baseline)
+    
+
 # COMMENTS
 - test data has lots of parkings
 - total entropy is not a good measure for the quality of the output (similar values for ground truth and bad output)
