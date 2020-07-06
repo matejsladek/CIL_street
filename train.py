@@ -13,6 +13,7 @@ from code.models import *
 from code.loss import *
 from code.metrics import *
 import json
+import argparse
 
 
 # enable memory growth and detects gpus
@@ -241,8 +242,15 @@ def run_experiment(config,prep_function):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c','--config_dir',default='config')
+    args = parser.parse_args()
+    argsdict = vars(args)
+
+    print(argsdict)
+
     # load each config file and run the experiment
-    for config_file in glob.glob('config/' + "*.json"):
+    for config_file in glob.glob( os.path.join(argsdict['config_dir'],"*.json") ):
         config = json.loads(open(config_file, 'r').read())
         name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
         config['log_folder'] = 'experiments/'+name
