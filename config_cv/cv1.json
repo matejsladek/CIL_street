@@ -12,7 +12,7 @@
   "predict_distance": false,
   "predict_contour": true,
   "batch_size": 4,
-  "epochs": 3,
+  "epochs": 30,
   "optimizer": "adam",
   "learning_rate": 0.0001,
   "loss": ["binary_crossentropy", "binary_crossentropy", "mse"],
@@ -21,13 +21,15 @@
   "postprocess": "morphological",
   "seed": 42,
   "use_cv": true,
-  "cv_k": 10,
-  "cv_k_todo": 1,
+  "cv_k": 5,
+  "cv_k_todo": 5,
   "img_size": 400,
   "img_size_test": 608,
   "n_channels": 3,
   "n_classes": 2,
   "buffer_size": 1000,
   "n_ensemble": 3,
-  "hard_mask": true
+  "hard_mask": true,
+  "stop_on_metric": false,
+  "aspp": false
 }

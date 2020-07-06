@@ -33,9 +33,14 @@ def get_dataset_cv(config, autotune):
 
     k_done = config['tmp']['cv_k_done']
     all_idxs = np.array(config['tmp']['cv_shuffled_idxs'])
-    train_idxs = np.append( all_idxs[ :config['cv_k']*k_done ],
-                            all_idxs[ config['cv_k']*(k_done+1): ] )
-    val_idxs = all_idxs[ config['cv_k']*k_done:config['cv_k']*(k_done+1) ]
+    N_fold = int(len(all_idxs)/config['cv_k'])
+    train_idxs = np.append( all_idxs[ :N_fold*k_done ],
+                            all_idxs[ N_fold*(k_done+1): ] )
+    val_idxs = all_idxs[ N_fold*k_done:N_fold*(k_done+1) ]
+
+    print('generated lens')
+    print(len(train_idxs))
+    print(len(val_idxs))
 
     training_data_root = os.path.join(*[config['tmp']['tmp_cv_data_folder'],'training','images'])
     training_gt_root = training_data_root.replace('images', 'groundtruth')
