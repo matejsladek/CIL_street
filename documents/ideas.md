@@ -141,6 +141,7 @@ Open questions:
     
 A:
         - Loss weight tuning: 1,2/1,2,4,8 for each (see Henry 2018 table)
+	- Morphological PP param: tune using PR curve?
 
 # COMMENTS
 - test data has lots of parkings
