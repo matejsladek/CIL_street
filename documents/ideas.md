@@ -90,6 +90,59 @@
 - [Best performing notebook from June 18](https://colab.research.google.com/drive/1n9rgCBDHuTttykR5Fz6JNRiEO253iIu2?usp=sharing) (after some tuning)
 - [Best performing notebook from June 22](https://colab.research.google.com/drive/12BbjdJz_upR8Q2Ta5bCH24lO0844VcnB?usp=sharing) (after dropping the library model)
 
+# Reporting and Experiments
+- Papers for reference: 
+    - Road Seg Specific: Henry 2018, Hinton&Mnih
+- Training
+    - Tensorflow version, GPU type, single (vs parallel)
+    - Hyperparameter table
+    - Rough convergence time
+- Metrics
+    - Main: IoU/Jaccard index, precision, recall (Commonly used metrics in literature are meaningful: facilitate comparison)
+    - Others: F1, Dice coef, Hausdorff distance, sensitivity, specificity
+    - Cross validated above: k=5,
+    - Hinton&Mnih: PR curve with buffer/patches- standard protocol
+    - Comment: accuracy is not illustrative
+
+- Metrics to report (according to Marco):
+	- from 5 fold CV: Accuracy, F1 score, patch-wise accuracy
+	- public test score on kaggle
+
+- Experiments
+    - Preprocess vs no preprocess (baseline) (Report IoU)
+    - original 90 vs original 90 + chicago 1800 (baseline) (Report IoU)
+    - Proceed with one combination: e.g. preprocess + original 90 + chicago 1800
+    - Briefly: Postprocess vs no postprocess
+    
+    - Discuss effect of changing: domain specific HPs, algo HPs
+
+    - Hyperparameter tuning using CV
+    - Threshold selection using PR curve
+    - Use CVed loss vs epochs plot to justify epochs trained, plot minimum as rigourous convergence measure
+
+- Models for comparison:
+	- Baseline #1 from programming exercises
+	- Baseline #2 from programming exercises
+	- resnet101 based unet with original data, no postor preprocessing
+	- resnet101 based unet with additional data and preprocessing
+	- add pretraining
+	- add squeeze and excitation to encoder (and maybe decoder) (seresnext101 backbone)
+	- enable MTL
+	- use an ensemble
+	- enable post process
+
+all steps should increase at least the patch wise accuracy expect maybe MTL, but hopefully that improves something else
+
+Open questions:
+	- what kind of MTL? how do we weight the losses? I think contour + reduced weight for secondary task is the way to go, but we would need to check
+	- what parameters for postprocessing? we do morphological transformations, but iteration number needs to be set
+	- how many networks in the ensemble?
+	- what parameters for random brightness/contrast?
+    
+A:
+        - Loss weight tuning: 1,2/1,2,4,8 for each (see Henry 2018 table)
+	- Morphological PP param: tune using PR curve?
+
 # COMMENTS
 - test data has lots of parkings
 - total entropy is not a good measure for the quality of the output (similar values for ground truth and bad output)

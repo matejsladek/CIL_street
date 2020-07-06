@@ -24,6 +24,8 @@ from train import *
 def get_dataset_cv(config, autotune):
     if config['dataset'] == 'original_all':
         all_data_root = "data/original/all/images/"
+    elif config['dataset'] == 'maps1800_all':
+        all_data_root = "data/maps1800/all/images/"
     else:
         raise Exception('Unrecognised dataset')
 

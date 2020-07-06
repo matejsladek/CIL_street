@@ -10,9 +10,9 @@
   "normalize": true,
   "backbone": "seresnext101",
   "predict_distance": false,
-  "predict_contour": true,
+  "predict_contour": false,
   "batch_size": 4,
-  "epochs": 150,
+  "epochs": 0,
   "optimizer": "adam",
   "learning_rate": 0.0001,
   "loss": ["binary_crossentropy", "binary_crossentropy", "mse"],
@@ -25,8 +25,12 @@
   "n_channels": 3,
   "n_classes": 2,
   "buffer_size": 1000,
-  "n_ensemble": 3,
+  "n_ensemble": 2,
   "hard_mask": true,
   "stop_on_metric": true,
-  "aspp": true
+  "aspp": false,
+  "augment_loss": false,
+  "custom_callback": true,
+  "bagging_threshold": 90,
+  "se": true
 }
