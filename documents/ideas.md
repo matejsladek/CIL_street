@@ -108,6 +108,29 @@
 - Experiments
     - Preprocess vs no preprocess (a baseline)
     
+- Metrics to report (according to Marco):
+	- from 5 fold CV: Accuracy, F1 score, patch-wise accuracy
+	- public test score on kaggle
+
+- Models for comparison:
+	- Baseline #1 from programming exercises
+	- Baseline #2 from programming exercises
+	- resnet101 based unet with original data, no postor preprocessing
+	- resnet101 based unet with additional data and preprocessing
+	- add pretraining
+	- add squeeze and excitation to encoder (and maybe decoder) (seresnext101 backbone)
+	- enable MTL
+	- use an ensemble
+	- enable post process
+
+all steps should increase at least the patch wise accuracy expect maybe MTL, but hopefully that improves something else
+
+Open questions:
+	- what kind of MTL? how do we weight the losses? I think contour + reduced weight for secondary task is the way to go, but we would need to check
+	- what parameters for postprocessing? we do morphological transformations, but iteration number needs to be set
+	- how many networks in the ensemble?
+	- what parameters for random brightness/contrast?
+    
 
 # COMMENTS
 - test data has lots of parkings
