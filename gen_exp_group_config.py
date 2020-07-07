@@ -57,8 +57,37 @@ def gen_table2_configs(base):
             {'backbone':'resnet101','se':False},
             {'pretrained':False},
             {'predict_distance':False,'predict_contour':False},
+            {'predict_distance':True,'predict_contour':False},
+            {'predict_distance':False,'predict_contour':True},
             {'n_ensemble':0},
             {'postprocess':'none'},
+
+            {'exp_group_baseline':True}
+            ]
+    config_list = diff_to_conf(base,exp_diff_list,exp_group_diff)
+    return config_list
+
+def gen_opt_lw_configs(base):
+    exp_group_name = 'exp_group_opt_lw'
+    exp_group_diff = {'name':os.path.join(exp_group_name,'exp')}
+    exp_diff_list = [
+            {'loss_weights':[1,1,1]},
+
+            {'loss_weights':[2,1,1]},
+            {'loss_weights':[1,2,1]},
+            {'loss_weights':[1,1,2]},
+
+            {'loss_weights':[2,2,1]},
+            {'loss_weights':[2,1,2]},
+            {'loss_weights':[1,2,2]},
+            
+            {'loss_weights':[4,1,1]},
+            {'loss_weights':[1,4,1]},
+            {'loss_weights':[1,1,4]},
+
+            {'loss_weights':[4,4,1]},
+            {'loss_weights':[4,1,4]},
+            {'loss_weights':[1,4,4]},
 
             {'exp_group_baseline':True}
             ]
@@ -73,10 +102,13 @@ if __name__=="__main__":
     argsdict = vars(args)
     print(argsdict)
 
+
     if argsdict['exp_group'] == 'table1':
         config_list = gen_table1_configs(good_model)
     elif argsdict['exp_group'] == 'table2':
         config_list = gen_table2_configs(best_model)
+    elif argsdict['exp_group'] == 'opt_lw':
+        config_list = gen_opt_lw_configs(good_model)
 
 
     exp_group_config_path = os.path.join(project_dir,'config_'+argsdict['exp_group'])
@@ -86,7 +118,7 @@ if __name__=="__main__":
 
     
     for i in range(len(config_list)):
-        out_file_path = os.path.join(exp_group_config_path,"exp"+str(i)+".json")
+        out_file_path = os.path.join(exp_group_config_path,"exp"+str(i).zfill(3)+".json")
         out_file = open( out_file_path, "w") 
         json.dump(config_list[i], out_file, indent = 6) 
         out_file.close()
