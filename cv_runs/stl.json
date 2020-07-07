@@ -32,5 +32,8 @@
   "augment_loss": false,
   "custom_callback": true,
   "bagging_threshold": 90,
-  "se": false
+  "se": false,
+  "use_cv": true,
+  "cv_k": 5,
+  "cv_k_todo": 5
 }
