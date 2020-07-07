@@ -1,5 +1,5 @@
 {
-  "name": "aug_0",
+  "name": "mtl_contour_distance",
   "dataset": "maps1800_all",
   "img_resize": 384,
   "v_flip": 0.5,
