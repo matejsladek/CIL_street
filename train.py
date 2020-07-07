@@ -112,16 +112,16 @@ def get_model(config):
 
     if config['predict_distance'] and config['predict_contour']:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'],
-                      loss_weights=config['loss_weights'], metrics=['accuracy', kaggle_metric, f1_m, tf.keras.metrics.MeanIoU(2)])
+                      loss_weights=config['loss_weights'], metrics=['accuracy', kaggle_metric, f1_m, iou])
     elif config['predict_distance']:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][[0, 2]],
-                      loss_weights=config['loss_weights'][[0, 2]], metrics=['accuracy', kaggle_metric, f1_m, tf.keras.metrics.MeanIoU(2)])
+                      loss_weights=config['loss_weights'][[0, 2]], metrics=['accuracy', kaggle_metric, f1_m, iou])
     elif config['predict_contour']:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0:2],
-                      loss_weights=config['loss_weights'][0:2], metrics=['accuracy', kaggle_metric, f1_m, tf.keras.metrics.MeanIoU(2)])
+                      loss_weights=config['loss_weights'][0:2], metrics=['accuracy', kaggle_metric, f1_m, iou])
     else:
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0],
-                      metrics=['accuracy', kaggle_metric, f1_m, tf.keras.metrics.MeanIoU(2)])
+                      metrics=['accuracy', kaggle_metric, f1_m, iou])
 
     return model
 

@@ -4,15 +4,15 @@ import numpy as np
 
 
 def recall_m(y_true, y_pred):
-    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+    true_positives = K.sum(K.clip(K.round(y_true) * K.round(y_pred), 0, 1))
+    possible_positives = K.sum(K.clip(K.round(y_true), 0, 1))
     recall = true_positives / (possible_positives + K.epsilon())
     return recall
 
 
 def precision_m(y_true, y_pred):
-    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+    true_positives = K.sum(K.clip(K.round(y_true) * K.round(y_pred), 0, 1))
+    predicted_positives = K.sum(K.clip(K.round(y_pred), 0, 1))
     precision = true_positives / (predicted_positives + K.epsilon())
     return precision
 
@@ -21,6 +21,14 @@ def f1_m(y_true, y_pred):
     precision = precision_m(y_true, y_pred)
     recall = recall_m(y_true, y_pred)
     return 2*((precision*recall)/(precision+recall+K.epsilon()))
+
+
+def iou(y_true, y_pred):
+    true_positives = K.sum(K.clip(K.round(y_true) * K.round(y_pred), 0, 1))
+    predicted_positives = K.sum(K.clip(y_pred, 0, 1))
+    false_positives = predicted_positives - true_positives
+    false_negatives = K.sum(K.clip(K.round(y_true) * K.round(1 - y_pred), 0, 1))
+    return true_positives / (true_positives + false_positives + false_negatives + K.epsilon())
 
 
 def patch_to_label(patch):
