@@ -1,0 +1,44 @@
+{
+  "name": "internal_baseline",
+  "dataset": "original_all",
+  "img_resize": 384,
+
+  "v_flip": 0,
+  "h_flip": 0,
+  "rot": 0,
+  "contrast": 0,
+  "brightness": 0,
+
+  "normalize": true,
+  "backbone": "resnet101",
+  "predict_distance": false,
+  "predict_contour": false,
+  "batch_size": 4,
+  "epochs": 150,
+  "optimizer": "adam",
+  "learning_rate": 0.0001,
+  "loss": ["binary_crossentropy", "binary_crossentropy", "mse"],
+  "loss_weights": [1, 1, 1],
+  "pretrained": false,
+  "postprocess": "none",
+  "seed": 42,
+
+  "use_cv": true,
+  "cv_k": 5,
+  "cv_k_todo": 5,
+  
+  "img_size": 400,
+  "img_size_test": 608,
+  "n_channels": 3,
+  "n_classes": 2,
+
+  "buffer_size": 1000,
+  "n_ensemble": 0,
+  "hard_mask": true,
+  "stop_on_metric": true,
+  "aspp": false,
+  "augment_loss": false,
+  "custom_callback": true,
+  "bagging_threshold": 90,
+  "se": false
+}
