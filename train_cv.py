@@ -121,7 +121,8 @@ def cv_setup(config):
     config['tmp']['cv_shuffled_idxs'] = all_shuffled_idx
     config['tmp']['cv_k_done'] = 0
     config['tmp']['top_log_folder'] = config['log_folder']
-    config['tmp']['tmp_cv_data_folder'] = 'data/tmp_cv'
+    #config['tmp']['tmp_cv_data_folder'] = 'data/tmp_cv'
+    config['tmp']['tmp_cv_data_folder'] = os.path.join(config['tmp']['top_log_folder'],'tmp_cv_data')
     print(config['tmp'])
     
     return(config)
