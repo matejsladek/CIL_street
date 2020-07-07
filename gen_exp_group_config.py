@@ -1,6 +1,7 @@
 import json
 import os
 import argparse
+import shutil
 
 project_dir = ""
 internal_baseline_path = os.path.join(*[project_dir,"config_archive","internal_baseline.json"])
@@ -35,7 +36,9 @@ def gen_table1_configs(base):
             {'dataset':'maps1800_all',
                 'v_flip':0,'h_flip':0,'rot':0,'contrast':0,'brightness':0},
             {'dataset':'original_all'},
-            {'dataset':'maps1800_all'}
+
+#            {'dataset':'maps1800_all'}
+            {'exp_group_baseline':True}
             ]
 #    exp_diff_list = [
 #            {'dataset':'original_all','preprocess':False},
@@ -56,6 +59,8 @@ def gen_table2_configs(base):
             {'predict_distance':False,'predict_contour':False},
             {'n_ensemble':0},
             {'postprocess':'none'},
+
+            {'exp_group_baseline':True}
             ]
     config_list = diff_to_conf(base,exp_diff_list,exp_group_diff)
     return config_list
@@ -84,9 +89,4 @@ if __name__=="__main__":
         out_file_path = os.path.join(exp_group_config_path,"exp"+str(i)+".json")
         out_file = open( out_file_path, "w") 
         json.dump(config_list[i], out_file, indent = 6) 
-        out_file.close() 
-
-
-
-
-
+        out_file.close()
