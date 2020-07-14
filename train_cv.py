@@ -19,6 +19,7 @@ from code.models import *
 from code.loss import *
 from code.metrics import *
 from train import *
+import train_ensemble as train_ensemble
 
 
 def get_dataset_cv(config, autotune):
@@ -145,7 +146,7 @@ def run_experiment_cv(config,prep_function):
             elif config['use_baseline_code2']:
                 print() # run_baseline2(config,prep_function) # baseline 2
             elif config['use_ensemble']:
-                print() # run_ensemble(config,prep_function) # train_ensemble.py
+                train_ensemble.run_experiment(config,prep_function) # train_ensemble.py
             else:
                 run_experiment(config,prep_function) # imported from train.py
             config['tmp']['cv_k_done'] += 1
@@ -155,7 +156,7 @@ def run_experiment_cv(config,prep_function):
         elif config['use_baseline_code2']:
             print() # run_baseline2(config,prep_function) # baseline 2
         elif config['use_ensemble']:
-            print() # run_ensemble(config,prep_function) # train_ensemble.py
+            train_ensemble.run_experiment(config,prep_function) # train_ensemble.py
         else:
             run_experiment(config,prep_function)
 
@@ -175,4 +176,5 @@ if __name__ == '__main__':
         name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
         config['log_folder'] = 'experiments/'+name
         os.makedirs(config['log_folder'])
+        print(config)
         run_experiment_cv(config,prep_experiment_cv)

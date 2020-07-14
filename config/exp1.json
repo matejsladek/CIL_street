@@ -32,5 +32,9 @@
   "augment_loss": false,
   "custom_callback": true,
   "bagging_threshold": 90,
-  "se": true
+  "se": true,
+  "use_cv": false,
+  "use_baseline_code1": false,
+  "use_baseline_code2": false,
+  "use_ensemble": false
 }
