@@ -5,18 +5,19 @@ First we should have some runs to answer some open questions
 1 - Runs for tuning, not to be reported
 
 	- Tuning for image augmentation: we try setting the random brightness and contrast at 0, 0.1 and 0.2
-		aug_0.json
+		aug_0.json <- best one
 		aug_01.json
 		aug_02.json
 	- Tuning for MTL: try single task learning network as well as all combinations
 		stl.json (same as aug_02.json)
 		mtl_contour.json
-		mtl_distance.json
+		mtl_distance.json <- best one
 		mtl_contour_distance.json
 	- Tuning for MTL weights: we take the best model from Tuning for MTL and try changing the loss weights. We still do not know what the best model is, so we neet to take the best one from "Tuning for MTL" and change the loss_weights parameter.
 		mtl_weights_05.json
 		mtl_weights_025.json
 		mtl_weights_075.json
+		mtl_weights_02 <- best one
 
 Once we run all of these we should have a good idea about what our best model is. We can then start writing the report/running the official cv runs.
 
