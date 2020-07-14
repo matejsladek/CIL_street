@@ -26,6 +26,8 @@ def get_dataset_cv(config, autotune):
         all_data_root = "data/original/all/images/"
     elif config['dataset'] == 'maps1800_all':
         all_data_root = "data/maps1800/all/images/"
+    elif config['dataset'] == 'retiled_all':
+        all_data_root = "data/retiled/all/images/"
     else:
         raise Exception('Unrecognised dataset')
 
@@ -106,6 +108,8 @@ def cv_setup(config):
         all_data_root = "data/original/all/images/"
     elif config['dataset'] == 'maps1800_all':
         all_data_root = "data/maps1800/all/images/"
+    elif config['dataset'] == 'retiled_all':
+        all_data_root = "data/retiled/all/images/"
     else:
         raise Exception('Unrecognised dataset')
 
@@ -136,10 +140,24 @@ def run_experiment_cv(config,prep_function):
             config['tmp']['cv_log_folder'] = os.path.join(config['tmp']['top_log_folder'],'split'+str(i))
             config['log_folder'] = config['tmp']['cv_log_folder']
             os.mkdir(config['tmp']['cv_log_folder'])
-            run_experiment(config,prep_function)
+            if config['use_baseline_code1']:
+                print() # run_baseline1(config,prep_function) # baseline 1
+            elif config['use_baseline_code2']:
+                print() # run_baseline2(config,prep_function) # baseline 2
+            elif config['use_ensemble']:
+                print() # run_ensemble(config,prep_function) # train_ensemble.py
+            else:
+                run_experiment(config,prep_function) # imported from train.py
             config['tmp']['cv_k_done'] += 1
     else:
-        run_experiment(config,prep_function)
+        if config['use_baseline_code1']:
+            print() # run_baseline1(config,prep_function) # baseline 1
+        elif config['use_baseline_code2']:
+            print() # run_baseline2(config,prep_function) # baseline 2
+        elif config['use_ensemble']:
+            print() # run_ensemble(config,prep_function) # train_ensemble.py
+        else:
+            run_experiment(config,prep_function)
 
 
 if __name__ == '__main__':
