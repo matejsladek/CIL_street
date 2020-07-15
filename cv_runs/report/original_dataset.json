@@ -35,5 +35,8 @@
   "se": true,
   "use_cv": true,
   "cv_k": 5,
-  "cv_k_todo": 5
+  "cv_k_todo": 5,
+  "use_baseline_code1": false,
+  "use_baseline_code2": false,
+  "use_ensemble": false
 }
