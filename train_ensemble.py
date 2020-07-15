@@ -88,6 +88,9 @@ def get_dataset(config, autotune):
 
     return train_dataset, val_dataset, val_dataset_numpy, trainset_size, valset_size, training_data_root, val_data_root
 
+def prep_experiment(config,autotune):
+    print('Load dataset')
+    return get_dataset(config, autotune)
 
 # build and compile the model
 def get_model(config):
@@ -174,11 +177,6 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
     if config['epochs'] > 0:
         model.load_weights(config['log_folder'] + '/best_model.h5')
     return model
-
-
-def prep_experiment(config,autotune):
-    print('Load dataset')
-    return get_dataset(config, autotune)
 
 
 def bag(in_path, out_path, config):
@@ -298,4 +296,4 @@ if __name__ == '__main__':
         name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
         config['log_folder'] = 'experiments/'+name
         os.makedirs(config['log_folder'])
-        run_experiment(config,prep_experiment)
+        run_experiment(config, prep_experiment)

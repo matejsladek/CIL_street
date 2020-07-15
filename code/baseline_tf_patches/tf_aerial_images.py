@@ -3,20 +3,20 @@ Baseline for CIL project on road segmentation.
 This simple baseline consits of a CNN with two convolutional+pooling layers with a soft-max loss
 """
 # source: https://github.com/dalab/lecture_cil_public/tree/master/exercises/2019/ex11_old
-
+from glob import glob
 import gzip
+import json
+import datetime
 import os
 import sys
 import urllib
 import matplotlib.image as mpimg
 from PIL import Image
-
 import code
-
 import tensorflow.python.platform
-
 import numpy
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.compat.v1.disable_eager_execution()
 
 NUM_CHANNELS = 3  # RGB images
 PIXEL_DEPTH = 255
@@ -197,17 +197,82 @@ def make_img_overlay(img, predicted_img, white=False):
     return new_img
 
 
-def main(argv=None):  # pylint: disable=unused-argument
 
-    data_dir = 'training/'
+# Make an image summary for 4d tensor image with index idx
+def get_image_summary(img, idx=0):
+    V = tf.slice(img, (0, 0, 0, idx), (1, -1, -1, 1))
+    img_w = img.get_shape().as_list()[1]
+    img_h = img.get_shape().as_list()[2]
+    min_value = tf.reduce_min(V)
+    V = V - min_value
+    max_value = tf.reduce_max(V)
+    V = V / (max_value * PIXEL_DEPTH)
+    V = tf.reshape(V, (img_w, img_h, 1))
+    V = tf.transpose(V, (2, 0, 1))
+    V = tf.reshape(V, (-1, img_w, img_h, 1))
+    return V
+
+# Make an image summary for 3d tensor image with index idx
+def get_image_summary_3d(img):
+    V = tf.slice(img, (0, 0, 0), (1, -1, -1))
+    img_w = img.get_shape().as_list()[1]
+    img_h = img.get_shape().as_list()[2]
+    V = tf.reshape(V, (img_w, img_h, 1))
+    V = tf.transpose(V, (2, 0, 1))
+    V = tf.reshape(V, (-1, img_w, img_h, 1))
+    return V
+
+# Get prediction for given input image
+def get_prediction(img):
+    data = numpy.asarray(img_crop(img, IMG_PATCH_SIZE, IMG_PATCH_SIZE))
+    data_node = tf.constant(data)
+    output = tf.nn.softmax(model(data_node))
+    output_prediction = s.run(output)
+    img_prediction = label_to_img(img.shape[0], img.shape[1], IMG_PATCH_SIZE, IMG_PATCH_SIZE, output_prediction)
+
+    return img_prediction
+
+# Get a concatenation of the prediction and groundtruth for given input file
+def get_prediction_with_groundtruth(filename, image_idx, fmt="satImage_%.3d", only_prediction=False):
+
+    # imageid = "satImage_%.3d" % image_idx
+    imageid = fmt % image_idx
+    image_filename = filename + imageid + ".png"
+    img = mpimg.imread(image_filename)
+
+    img_prediction = get_prediction(img)
+
+    cimg, gt_img_3c = concatenate_images(img, img_prediction)
+    if only_prediction:
+        return gt_img_3c
+    return cimg
+
+# Get prediction overlaid on the original image for given input file
+def get_prediction_with_overlay(filename, image_idx, fmt="satImage_%.3d", white=False):
+
+    # imageid = "satImage_%.3d" % image_idx
+    imageid = fmt % image_idx
+    image_filename = filename + imageid + ".png"
+    img = mpimg.imread(image_filename)
+
+    img_prediction = get_prediction(img)
+    oimg = make_img_overlay(img, img_prediction, white=white)
+
+    return oimg
+
+
+def run_experiment(config,prep_function):
+
+    data_dir =  "/home/jonathan/CIL-street/data/original/" + 'training/'
     train_data_filename = data_dir + 'images/'
     train_labels_filename = data_dir + 'groundtruth/'
     test_data_filename = "test_images/"
 
     # Extract it into numpy arrays.
+    autotune = tf.data.experimental.AUTOTUNE
     train_data = extract_data(train_data_filename, TRAINING_SIZE)
     train_labels = extract_labels(train_labels_filename, TRAINING_SIZE)
-
+    
     num_epochs = NUM_EPOCHS
 
     c0 = 0
@@ -274,67 +339,6 @@ def main(argv=None):  # pylint: disable=unused-argument
                             seed=SEED))
     fc2_biases = tf.Variable(tf.constant(0.1, shape=[NUM_LABELS]))
 
-    # Make an image summary for 4d tensor image with index idx
-    def get_image_summary(img, idx=0):
-        V = tf.slice(img, (0, 0, 0, idx), (1, -1, -1, 1))
-        img_w = img.get_shape().as_list()[1]
-        img_h = img.get_shape().as_list()[2]
-        min_value = tf.reduce_min(V)
-        V = V - min_value
-        max_value = tf.reduce_max(V)
-        V = V / (max_value * PIXEL_DEPTH)
-        V = tf.reshape(V, (img_w, img_h, 1))
-        V = tf.transpose(V, (2, 0, 1))
-        V = tf.reshape(V, (-1, img_w, img_h, 1))
-        return V
-
-    # Make an image summary for 3d tensor image with index idx
-    def get_image_summary_3d(img):
-        V = tf.slice(img, (0, 0, 0), (1, -1, -1))
-        img_w = img.get_shape().as_list()[1]
-        img_h = img.get_shape().as_list()[2]
-        V = tf.reshape(V, (img_w, img_h, 1))
-        V = tf.transpose(V, (2, 0, 1))
-        V = tf.reshape(V, (-1, img_w, img_h, 1))
-        return V
-
-    # Get prediction for given input image
-    def get_prediction(img):
-        data = numpy.asarray(img_crop(img, IMG_PATCH_SIZE, IMG_PATCH_SIZE))
-        data_node = tf.constant(data)
-        output = tf.nn.softmax(model(data_node))
-        output_prediction = s.run(output)
-        img_prediction = label_to_img(img.shape[0], img.shape[1], IMG_PATCH_SIZE, IMG_PATCH_SIZE, output_prediction)
-
-        return img_prediction
-
-    # Get a concatenation of the prediction and groundtruth for given input file
-    def get_prediction_with_groundtruth(filename, image_idx, fmt="satImage_%.3d", only_prediction=False):
-
-        # imageid = "satImage_%.3d" % image_idx
-        imageid = fmt % image_idx
-        image_filename = filename + imageid + ".png"
-        img = mpimg.imread(image_filename)
-
-        img_prediction = get_prediction(img)
-
-        cimg, gt_img_3c = concatenate_images(img, img_prediction)
-        if only_prediction:
-            return gt_img_3c
-        return cimg
-
-    # Get prediction overlaid on the original image for given input file
-    def get_prediction_with_overlay(filename, image_idx, fmt="satImage_%.3d", white=False):
-
-        # imageid = "satImage_%.3d" % image_idx
-        imageid = fmt % image_idx
-        image_filename = filename + imageid + ".png"
-        img = mpimg.imread(image_filename)
-
-        img_prediction = get_prediction(img)
-        oimg = make_img_overlay(img, img_prediction, white=white)
-
-        return oimg
 
     # We will replicate the model structure for the training subgraph, as well
     # as the evaluation subgraphs, while sharing the trainable parameters.
@@ -352,19 +356,19 @@ def main(argv=None):  # pylint: disable=unused-argument
         # Max pooling. The kernel size spec {ksize} also follows the layout of
         # the data. Here we have a pooling window of 2, and a stride of 2.
         pool = tf.nn.max_pool(relu,
-                              ksize=[1, 2, 2, 1],
-                              strides=[1, 2, 2, 1],
-                              padding='SAME')
+                                ksize=[1, 2, 2, 1],
+                                strides=[1, 2, 2, 1],
+                                padding='SAME')
 
         conv2 = tf.nn.conv2d(pool,
-                             conv2_weights,
-                             strides=[1, 1, 1, 1],
-                             padding='SAME')
+                                conv2_weights,
+                                strides=[1, 1, 1, 1],
+                                padding='SAME')
         relu2 = tf.nn.relu(tf.nn.bias_add(conv2, conv2_biases))
         pool2 = tf.nn.max_pool(relu2,
-                               ksize=[1, 2, 2, 1],
-                               strides=[1, 2, 2, 1],
-                               padding='SAME')
+                                ksize=[1, 2, 2, 1],
+                                strides=[1, 2, 2, 1],
+                                padding='SAME')
 
         # Uncomment these lines to check the size of each layer
         # print 'data ' + str(data.get_shape())
@@ -402,6 +406,7 @@ def main(argv=None):  # pylint: disable=unused-argument
             filter_summary5 = tf.summary.image('summary_pool2' + summary_id, s_pool2)
 
         return out
+        
 
     # Training computation: logits + cross-entropy loss.
     logits = model(train_data_node, True)  # BATCH_SIZE*NUM_LABELS
@@ -543,6 +548,19 @@ def main(argv=None):  # pylint: disable=unused-argument
             oimg = get_prediction_with_overlay(test_data_filename, i, "test_%d")
             oimg.save(prediction_test_dir + "overlay_" + str(i) + ".png")
 
+    return 0
+
+def prep_experiment():
+    return 0
+
+def main(argv=None):  
+    # load each config file and run the experiment
+    for config_file in glob('config/' + "*.json"):
+        config = json.loads(open(config_file, 'r').read())
+        name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
+        config['log_folder'] = 'experiments/'+name
+        os.makedirs(config['log_folder'])
+        run_experiment(config, prep_experiment)
 
 if __name__ == '__main__':
     tf.app.run()

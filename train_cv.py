@@ -20,7 +20,8 @@ from code.loss import *
 from code.metrics import *
 from train import *
 import train_ensemble as train_ensemble
-
+import code.baseline_regression.segment_aerial_images_to_py as baseline_regression
+import code.baseline_tf_patches.tf_aerial_images as baseline_tf_patches
 
 def get_dataset_cv(config, autotune):
     if config['dataset'] == 'original_all':
@@ -142,23 +143,23 @@ def run_experiment_cv(config,prep_function):
             config['log_folder'] = config['tmp']['cv_log_folder']
             os.mkdir(config['tmp']['cv_log_folder'])
             if config['use_baseline_code1']:
-                print() # run_baseline1(config,prep_function) # baseline 1
+                baseline_regression.run_experiment(config, prep_function) # run_baseline1(config,prep_function) # baseline 1
             elif config['use_baseline_code2']:
-                print() # run_baseline2(config,prep_function) # baseline 2
+                baseline_tf_patches.run_experiment(config, prep_function) # run_baseline2(config,prep_function) # baseline 2
             elif config['use_ensemble']:
-                train_ensemble.run_experiment(config,prep_function) # train_ensemble.py
+                train_ensemble.run_experiment(config, prep_function) # train_ensemble.py
             else:
-                run_experiment(config,prep_function) # imported from train.py
+                run_experiment(config, prep_function) # imported from train.py
             config['tmp']['cv_k_done'] += 1
     else:
         if config['use_baseline_code1']:
-            print() # run_baseline1(config,prep_function) # baseline 1
+            baseline_regression.run_experiment(config, prep_function) # run_baseline1(config,prep_function) # baseline 1
         elif config['use_baseline_code2']:
-            print() # run_baseline2(config,prep_function) # baseline 2
+            baseline_tf_patches.run_experiment(config, prep_function) # run_baseline2(config,prep_function) # baseline 2
         elif config['use_ensemble']:
-            train_ensemble.run_experiment(config,prep_function) # train_ensemble.py
+            train_ensemble.run_experiment(config, prep_function) # train_ensemble.py
         else:
-            run_experiment(config,prep_function)
+            run_experiment(config, prep_function)
 
 
 if __name__ == '__main__':
