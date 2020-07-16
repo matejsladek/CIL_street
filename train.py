@@ -1,3 +1,10 @@
+# -----------------------------------------------------------
+# Main training script. Requires a config folder to be passed as a parameter. For each .json file in that folder
+# an experiment is run.
+# CIL 2020 - Team NaN
+# -----------------------------------------------------------
+import json
+import argparse
 from glob import glob
 import numpy as np
 import tensorflow as tf
@@ -12,12 +19,13 @@ from code.utils import *
 from code.models import *
 from code.loss import *
 from code.metrics import *
-import json
-import argparse
 
 
-# enable memory growth and detects gpus
 def prepare_gpus():
+    """
+    Enable memory growth and detect GPU
+    :return: nothing
+    """
     print(f"Tensorflow ver. {tf.__version__}")
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
@@ -30,9 +38,15 @@ def prepare_gpus():
             print(e)
 
 
-# retrieve tf.Datasets from globs of images paths, applies preprocessing
 def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
-    # can use from_tensor_slices to speed up
+    """
+    Retrieve tf.Datasets from globs of images paths, applies preprocessing.
+    :param training_data_glob: glob of training images
+    :param val_data_glob: glob of validation images
+    :param config: configuration dictionary
+    :param autotune: tensorflow autotune
+    :return: training and validation tf.Datasets, as well as a numpy validation copy to be used for consistent evaluation
+    """
     train_dataset = tf.data.Dataset.list_files(training_data_glob, seed=config['seed'])
     train_dataset = train_dataset.map(get_parse_image(hard=config['hard_mask']))
     train_image_loader = get_load_image_train(size=config['img_resize'],
@@ -56,9 +70,9 @@ def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
     val_dataset = val_dataset.map(val_image_loader)
     val_dataset = val_dataset.batch(config['batch_size']).prefetch(buffer_size=autotune)
 
+    # prepare numpy copy of validation set
     val_dataset_copy = val_dataset
     val_dataset_copy = list(val_dataset_copy)
-
     if config['predict_contour'] or config['predict_distance']:
         val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_copy])
         val_dataset_numpy_y_mask = np.concatenate([b[0].numpy()[:, ...] for a,b in val_dataset_copy])
@@ -72,8 +86,14 @@ def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
     return train_dataset, val_dataset, val_dataset_numpy
 
 
-# produce datasets according to config
 def get_dataset(config, autotune):
+    """
+    Produces datasets according to config.
+    :param config: configuration dictionary
+    :param autotune: tensorflow autotune
+    :return: datasets, their size and the path from which they were loaded
+    """
+    # select dataset root according to its name
     if config['dataset'] == 'original':
         training_data_root = "data/original/training/images/"
     else:
@@ -90,22 +110,24 @@ def get_dataset(config, autotune):
     return train_dataset, val_dataset, val_dataset_numpy, trainset_size, valset_size, training_data_root, val_data_root
 
 
-# build and compile the model
 def get_model(config):
+    """
+    Builds and compiles the model according to config
+
+    :param config: config dictionary
+    :return: model ready for training
+    """
     learning_rate = config['learning_rate']
 
     encoder_weights = None
     if config['pretrained']:
         encoder_weights = 'imagenet'
 
-    model = PretrainedUnet(backbone_name=config['backbone'],
-                           input_shape=(config['img_resize'], config['img_resize'], config['n_channels']),
-                           encoder_weights=encoder_weights, encoder_freeze=False,
-                           predict_distance=config['predict_distance'], predict_contour=config['predict_contour'],
-                           aspp=config['aspp'], se=config['se'])
-
-    def custom_loss(y_pred, y_true):
-        return tf.keras.losses.binary_crossentropy(y_true, y_pred) + y_pred*(1-y_pred)
+    model = RoadNet(backbone_name=config['backbone'],
+                    input_shape=(config['img_resize'], config['img_resize'], config['n_channels']),
+                    encoder_weights=encoder_weights, encoder_freeze=False,
+                    predict_distance=config['predict_distance'], predict_contour=config['predict_contour'],
+                    aspp=config['aspp'], se=config['se'])
 
     if config['augment_loss']:
         config['loss'][0] = custom_loss
@@ -126,16 +148,28 @@ def get_model(config):
     return model
 
 
-# create the model and train it, load weights from epoch with best val loss
-def create_and_train_model(train_dataset, val_dataset_original, val_dataset_numpy, steps_per_epoch, config):
+def create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_per_epoch, config):
+    """
+    Creates the model and trains it. Weights are restored from best epoch according to validation kaggle_metric.
+    :param train_dataset: training dataset
+    :param val_dataset: validation dataset
+    :param val_dataset_numpy: numpy version of validation dataset for simple and consistent evaluation
+    :param steps_per_epoch: steps per epoch during training
+    :param config: config dictionary
+    :return: trained model
+    """
+
     model = get_model(config)
     val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
 
+    # custom model saving callback to solve inconsistencies with model.evaluate() and tf.Datasets
     class CustomCallback(tf.keras.callbacks.Callback):
         def __init__(self):
             super(CustomCallback, self).__init__()
             self.lowest_loss = 100
             self.highest_metric = 0
+
+            # select correct index of model.evaluate() result according to config
             self.metric_index = 2
             self.loss_index = 0
             if config['predict_contour'] or config['predict_distance']:
@@ -160,20 +194,22 @@ def create_and_train_model(train_dataset, val_dataset_original, val_dataset_nump
     if config['custom_callback']:
         callbacks.append(CustomCallback())
     else:
-        # only works with single task learning
+        # only supports single task learning
         callbacks.append(tf.keras.callbacks.ModelCheckpoint(config['log_folder'] + '/best_model.h5',
                                                             monitor='val_kaggle_metric' and config['stop_on_metric'] or 'val_loss',
                                                             verbose=1,
                                                             save_best_only=True,
                                                             save_weights_only=True))
 
+    # train model
     model_history = model.fit(train_dataset, epochs=config['epochs'],
                               steps_per_epoch=steps_per_epoch,
-                              validation_data=val_dataset_original,
+                              validation_data=val_dataset,
                               callbacks=callbacks)
 
     if config['epochs'] > 0:
         model.load_weights(config['log_folder'] + '/best_model.h5')
+
     return model
 
 
@@ -183,22 +219,31 @@ def prep_experiment(config,autotune):
 
 
 def run_experiment(config,prep_function):
+    """
+    Trains and evaluates a model before computing and saving test predictions, all according to the config file.
+    :param config: config dictionary
+    :param prep_function: data loader
+    :return: nothing
+    """
+
+    # tensorflow setup
     autotune = tf.data.experimental.AUTOTUNE
     prepare_gpus()
 
+    # retrieve datasets
     train_dataset, val_dataset, val_dataset_numpy,\
     trainset_size, valset_size, training_data_root, val_data_root = prep_function(config,autotune)
     val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
-
     print(f"Training dataset contains {trainset_size} images.")
     print(f"Validation dataset contains {valset_size} images.")
     steps_per_epoch = max(trainset_size // config['batch_size'], 1)
 
+    # train
     print('Begin training')
     model = create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_per_epoch, config)
 
+    # compute and save validation scores
     postprocess = get_postprocess(config['postprocess'])
-
     print('Saving validation scores')
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")
     out_file.write("Validation results\n")
@@ -221,9 +266,12 @@ def run_experiment(config,prep_function):
     out_file.close()
     print('Validation is successful')
 
+    # save predictions on test images
     in_test_path = 'data/test_images'
+    # folder for predictions
     pred_test_path = os.path.join(config['log_folder'], "pred_test")
     os.mkdir(pred_test_path)
+    # folder for postprocessed predictions
     postprocess_test_path = os.path.join(config['log_folder'], "postprocess_test")
     os.mkdir(postprocess_test_path)
 
@@ -235,6 +283,8 @@ def run_experiment(config,prep_function):
                      postprocessed_output_path=postprocess_test_path,
                      config=config,
                      postprocess=postprocess)
+
+    # save predictions as csv files for simple submission
     to_csv(pred_test_path, os.path.join(config['log_folder'], 'pred_submission.csv'))
     to_csv(postprocess_test_path, os.path.join(config['log_folder'],'postprocess_submission.csv'))
 
@@ -246,8 +296,6 @@ if __name__ == '__main__':
     parser.add_argument('-c','--config_dir',default='config')
     args = parser.parse_args()
     argsdict = vars(args)
-
-    print(argsdict)
 
     # load each config file and run the experiment
     for config_file in glob.glob( os.path.join(argsdict['config_dir'],"*.json") ):

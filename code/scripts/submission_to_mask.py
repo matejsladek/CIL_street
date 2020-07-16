@@ -1,7 +1,9 @@
 #!/usr/bin/python
+# -----------------------------------------------------------
+# Original script provided for the course project
+# -----------------------------------------------------------
 import os
 import sys
-# import Image
 from PIL import Image
 import math
 import matplotlib.image as mpimg

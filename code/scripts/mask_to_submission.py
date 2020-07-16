@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# -----------------------------------------------------------
+# Original script provided for the course project
+# -----------------------------------------------------------
 
 import os
 import numpy as np
