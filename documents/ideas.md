@@ -1,13 +1,12 @@
 # TODO:
 
-- pretraining with GMaps/SpaceNet (fine tuning on the original dataset with lower learning rate or frozen encoder)
-- add Jonathan's images to dataset
-- check values for image augmentations: brightness, color shift
-- try different color space representations for input
-- finish K-NN post processing
-- different MTL architecture (?)
-- GAN based post processing
-- stacking/voting (?)
+- for post processing, find best number of iterations (2 parameters)
+- find right parameter for ensemble
+- last cv runs for the report
+	- table 2
+	- table 3 (need cross validated f1, accuracy, patch wise accuracy and iou on the two baselines and on ensemble)
+- finish up report
+- add requirements.txt
 
 # SIMILAR PROJECTS
 - [DeepGlobe: huge competition with many solutions](http://deepglobe.org/leaderboard.html)
