@@ -1,3 +1,7 @@
+# -----------------------------------------------------------
+# Implementation of our postprocessing methods.
+# CIL 2020 - Team NaN
+# -----------------------------------------------------------
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,14 +13,13 @@ from sklearn.cluster import KMeans
 from scipy import ndimage
 from scipy.ndimage import measurements
 
-MASK_2_BINARY_THRESHOLD = 0.25
-N_FEATS = 6
-N_CLUSTERS = 50
-BM_IN_AREA_PREC_THRESHOLD = 0.25
-IMG_TYPE = 'png'
-
 
 def get_postprocess(name):
+    """
+    Retrieves the postprocessing method
+    :param name: name of the postprocessing function
+    :return: postprocessing method
+    """
     if name == 'morphological':
         return morphological_postprocessing
     elif name == 'none':
@@ -25,19 +28,37 @@ def get_postprocess(name):
 
 
 def no_postprocessing(imgs):
+    """
+    Dummy postprocessing that does nothing.
+    :param imgs: 3D numpy array of images to process
+    :return: the same array
+    """
     return imgs
 
 
 def morphological_postprocessing(imgs):
+    """
+    Morphological transformation of imgs in order to binarize the image and remove noise through erosion and dilation.
+    :param imgs: 3D numpy array of images to process
+    :return: postprocessed array
+    """
     out = []
     for img in imgs:
         kernel = np.ones((3,3), np.uint8)
-        img = cv2.dilate(img, kernel, iterations=3)
-        img = cv2.erode(img, kernel, iterations=8)
-        out.append(cv2.dilate(img, kernel, iterations=3))
+        _, img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+        img = cv2.erode(img, kernel, iterations=7)
+        img = cv2.dilate(img, kernel, iterations=7)
+        out.append(img)
     out = np.expand_dims(np.stack(out), -1)
     return out
         
+
+MASK_2_BINARY_THRESHOLD = 0.25
+N_FEATS = 6
+N_CLUSTERS = 50
+BM_IN_AREA_PREC_THRESHOLD = 0.25
+IMG_TYPE = 'png'
+
 
 class KMPP_single_image:
     def __init__(self):

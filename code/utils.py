@@ -1,3 +1,7 @@
+# -----------------------------------------------------------
+# Collection of utilities.
+# CIL 2020 - Team NaN
+# -----------------------------------------------------------
 import IPython.display as display
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -9,7 +13,19 @@ import matplotlib.image as mpimg
 import re
 import glob
 
+
 def save_predictions(model, crop, input_path, output_path, postprocessed_output_path, config, postprocess=None):
+    """
+    Loads test images, computes and saves the model's predictions
+    :param model: models to use for prediction (usually trained)
+    :param crop: if true, instead of resizing test images, it crops them and aggregates the predictions
+    :param input_path: path to test images
+    :param output_path: path where to save predictions
+    :param postprocessed_output_path: path were to save predictions after postprocessing
+    :param config: experiment config for additional parameters
+    :param postprocess: postprocessing function. If None, postprocessing is not applied.
+    :return: nothing
+    """
     model_size = config['img_resize'],
     output_size = config['img_size_test'],
     normalize = config['normalize'],
@@ -17,17 +33,22 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
     test_list = glob.glob(input_path + '/*.png')
 
     for image_path in test_list:
-        print(image_path)
+
         if crop:
+            # load image
             image = tf.io.read_file(image_path)
             image = tf.image.decode_png(image, channels=3)
             image = tf.image.convert_image_dtype(image, tf.uint8)
+
+            # normalize image
             if normalize:
                 image = tf.cast(image, tf.float32) / 255.0
 
+            # divide image in crops
             img_parts = [image[:400, :400, :], image[:400, -400:, :], image[-400:, :400, :], image[-400:, -400:, :]]
             out_parts = []
             for img in img_parts:
+                # compute predicted mask
                 resized_img = tf.image.resize(img, (384, 384)).numpy()
                 resized_img = np.expand_dims(resized_img, 0)
                 if config['predict_contour'] or config['predict_distance']:
@@ -38,6 +59,7 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
                     output = output * 255.0
                 out_parts.append(np.array(tf.keras.preprocessing.image.array_to_img(output).resize((400, 400))))
 
+            # aggregate predictions
             output = np.zeros((608, 608))
             output[:304, :304] = out_parts[0][:304, :304]
             output[:304, -304:] = out_parts[1][:304, -304:]
@@ -45,15 +67,19 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
             output[-304:, -304:] = out_parts[3][-304:, -304:]
             output = np.expand_dims(output, -1)
         else:
+            # load image
             image = tf.io.read_file(image_path)
             image = tf.image.decode_png(image, channels=3)
             image = tf.image.convert_image_dtype(image, tf.uint8)
+            # resize image
             image = tf.image.resize(image, (384, 384))
+            # normalize image
             if normalize:
                 image = tf.cast(image, tf.float32) / 255.0
             image = image.numpy()
             image = np.expand_dims(image, 0)
 
+            # compute predicted mask
             if config['predict_contour'] or config['predict_distance']:
                 output = model.predict(image)[0][0]
             else:
@@ -65,28 +91,15 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
         output = output.astype(np.uint8)
         output_img = tf.keras.preprocessing.image.array_to_img(output).resize((608, 608))
 
+        # save prediction
         image_name = os.path.basename(image_path)
         output_img.save(output_path + '/' + image_name)
         if postprocess is None:
             continue
+        # apply postprocessing and save copy
         postprocessed_output = np.squeeze(postprocess(np.expand_dims(output, 0)), axis=0)
         postprocessed_output_img = tf.keras.preprocessing.image.array_to_img(postprocessed_output).resize((608, 608))
         postprocessed_output_img.save(postprocessed_output_path + '/' + image_name)
-
-
-def plot_loss(model_history):
-    loss = model_history.history['loss']
-    val_loss = model_history.history['val_loss']
-    epochs = range(len(loss))
-    plt.figure()
-    plt.plot(epochs, loss, 'r', label='Training loss')
-    plt.plot(epochs, val_loss, 'bo', label='Validation loss')
-    plt.title('Training and Validation Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss Value')
-    plt.ylim([np.min(val_loss + loss) - 0.1, np.max(val_loss + loss) + 0.1])
-    plt.legend()
-    plt.show()
 
 
 def unet_freeze_encoder(model):
@@ -97,6 +110,12 @@ def unet_freeze_encoder(model):
 
 
 def to_csv(path, submission_filename):
+    """
+    Adapts the default csv saving scripts to work directly on a folder with predictions.
+    :param path: path to predictions
+    :param submission_filename: name of the sumbission file
+    :return: nothing
+    """
 
     foreground_threshold = 0.25  # percentage of pixels > 1 required to assign a foreground label to a patch
 

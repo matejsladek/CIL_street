@@ -1,13 +1,33 @@
+# -----------------------------------------------------------
+# Implementation of models. The second one is kept as a reference, while the first one is our best model.
+# CIL 2020 - Team NaN
+# -----------------------------------------------------------
 import tensorflow as tf
 from tensorflow.keras.layers import *
 from classification_models.tfkeras import Classifiers
 
 
-def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_weights='imagenet',
-                   encoder_freeze=False, predict_distance=False, predict_contour=False, aspp=False, se=False):
+def RoadNet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_weights='imagenet',
+            encoder_freeze=False, predict_distance=False, predict_contour=False, aspp=False, se=False):
+    """
+    Encoder-decoder based architecture for road segmentation in aerial images.
 
-    decoder_filters=(256, 128, 64, 32, 16)
-    n_blocks=len(decoder_filters)
+    :param backbone_name: name of the backbone network. Supported backbones are ResNet50, ResNet101, SEResNet50,
+                          SEResNet101, ResNeXt50, ResNeXt101, SEResNeXt50 and  SEResNeXt101.
+    :param input_shape: input shape, where the first two dimensions need to be a multiple of 16.
+    :param encoder_weights: name of dataset for which to load weights. Only ImageNet is supported.
+    :param encoder_freeze: freezes the weights in the backbone save from batch normalization layers
+    :param predict_distance: if true, adds an additional output predicting the distance map of the road mask
+    :param predict_contour: if true, adds an additional output predicting the contour of the road mask
+    :param aspp: if true, the encoder output is passed through an ASPP module. More info at
+                 http://liangchiehchen.com/projects/DeepLab.html
+    :param se: if true, enables Squeeze and Excitation on the decoder convolutional blocks. More info at
+               https://arxiv.org/abs/1709.01507
+    :return: a tf.keras instance of the model
+    """
+
+    decoder_filters = (256, 128, 64, 32, 16)
+    n_blocks = len(decoder_filters)
     skip_layers_dict = {'seresnext50': (1078, 584, 254, 4), 'seresnext101': (2472, 584, 254, 4),
                         'seresnet101': (552, 136, 62, 4), 'seresnet50': (246, 136, 62, 4),
                         'resnext50': ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'),
@@ -16,6 +36,7 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
                         'resnet101': ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0')}
     skip_layers = skip_layers_dict[backbone_name]
 
+    # load backbone network from external library
     backbone_fn, _ = Classifiers.get(backbone_name)
     backbone = backbone_fn(input_shape=input_shape, weights=encoder_weights, include_top=False)
     skips = ([backbone.get_layer(name=i).output if isinstance(i, str)
@@ -23,13 +44,14 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
 
     x = backbone.output
 
+    # build ASPP if requested
     if aspp:
         b0 = GlobalAveragePooling2D()(x)
         b0 = Lambda(lambda x: tf.keras.backend.expand_dims(x, 1))(b0)
         b0 = Lambda(lambda x: tf.keras.backend.expand_dims(x, 1))(b0)
         b0 = Conv2D(256, (1, 1), padding='same', use_bias=False, name='aspp_pooling')(b0)
         b0 = BatchNormalization(name='aspp_pooling_bn')(b0)
-        b0 = tf.keras.layers.Activation('relu', name='aspp_pooling_relu')(b0)
+        b0 = Activation('relu', name='aspp_pooling_relu')(b0)
         b0 = Lambda(lambda x : tf.image.resize(x, (12, 12)))(b0)
 
         b1 = Conv2D(256, 1, padding='same', dilation_rate=(1, 1), kernel_initializer='he_normal', name='aspp_b1_conv')(x)
@@ -47,11 +69,13 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
         x = BatchNormalization(axis=3, name='aspp_concat_bn')(x)
         x = Activation('relu', name='aspp_concat_relu')(x)
 
+    # create the decoder blocks sequentially
     for i in range(n_blocks):
 
         filters = decoder_filters[i]
 
         x = UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(x)
+        # skip connection
         if i < len(skips):
             x = Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([x, skips[i]])
 
@@ -59,6 +83,7 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
         x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
         x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
 
+        # Squeeze and Excitation on the first convolution
         if se:
             w = GlobalAveragePooling2D(name='decoder_stage{}a_se_avgpool'.format(i))(x)
             w = Dense(filters // 8, activation='relu', name='decoder_stage{}a_se_dense1'.format(i))(w)
@@ -69,6 +94,7 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
         x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
         x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
 
+        # Squeeze and Excitation on the second convolution
         if se:
             w = GlobalAveragePooling2D(name='decoder_stage{}b_se_avgpool'.format(i))(x)
             w = Dense(filters // 8, activation='relu', name='decoder_stage{}b_se_dense1'.format(i))(w)
@@ -78,6 +104,7 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
     task1 = Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_mask')(x)
     task1 = Activation('sigmoid', name='final_activation_mask')(task1)
 
+    # prepare for Multitask Learning
     if predict_contour:
         task2 = Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_contour')(x)
         task2 = Activation('sigmoid', name='final_activation_contour')(task2)
@@ -96,6 +123,7 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
 
     model = tf.keras.models.Model(backbone.input, output)
 
+    # freeze encoder weights if requested
     if encoder_freeze:
         for layer in backbone.layers:
             if not isinstance(layer, tf.keras.layers.BatchNormalization):
@@ -104,9 +132,26 @@ def PretrainedUnet(backbone_name='seresnext50', input_shape=(None, None, 3), enc
     return model
 
 
-# flexible implementation
 def CustomUNet(blocks=4, conv_per_block=2, filters=16, activation='relu', dropout=0.2, bn=True, dilation=False, depth=6,
                aspp=False, aggregate='add', upsample=False):
+    """
+    Flexible UNet implementation from our first experiments
+
+    :param blocks: number of encoder and decoder blocks
+    :param conv_per_block: number of convlutional layers in each block
+    :param filters: filter in the first encoder block. Each block in the encoder has twice as many filters as the one
+                    before, while the opposite happens in the decoder.
+    :param activation: activation function
+    :param dropout: dropout probability
+    :param bn: activates Batch Normalization layers
+    :param dilation: whether to use dilated convolutions in lowest blocks
+    :param depth: number of convolutional layers in lowest block
+    :param aspp: adds an ASPP module
+    :param aggregate: selects how to aggregate the output of dilated convolutions (addition or concatenation)
+    :param upsample: enables upsampling instead of transpose convolutions in the decoder
+    :return: a tf.keras instance of the model
+    """
+
     input_size = (400, 400, 3)
     inputs = Input(input_size)
     x = inputs
