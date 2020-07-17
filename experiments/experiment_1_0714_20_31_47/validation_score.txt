@@ -1,6 +1,0 @@
-Validation results
-
-Kaggle metric on predictions: 
-tf.Tensor(0.78112, shape=(), dtype=float32)
-Kaggle metric on predictions after post processing: 
-tf.Tensor(0.78128, shape=(), dtype=float32)
