@@ -9,6 +9,7 @@ from glob import glob
 import numpy as np
 import tensorflow as tf
 import datetime, os
+import logging
 from tensorflow.keras.layers import *
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
@@ -127,7 +128,7 @@ def get_model(config):
                     input_shape=(config['img_resize'], config['img_resize'], config['n_channels']),
                     encoder_weights=encoder_weights, encoder_freeze=False,
                     predict_distance=config['predict_distance'], predict_contour=config['predict_contour'],
-                    aspp=config['aspp'], se=config['se'])
+                    aspp=config['aspp'], se=config['se'], residual=config['residual'])
 
     if config['augment_loss']:
         config['loss'][0] = custom_loss
@@ -201,6 +202,10 @@ def create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_
                                                             save_best_only=True,
                                                             save_weights_only=True))
 
+    csv_logger = CSVLogger(os.path.join(config['log_folder'],'train_log.csv'), append=True, separator=';')
+    callbacks.append(csv_logger)
+    logging.info("no. callbacks: %d"%(len(callbacks)))
+    logging.info(str(callbacks))
     # train model
     model_history = model.fit(train_dataset, epochs=config['epochs'],
                               steps_per_epoch=steps_per_epoch,
@@ -226,6 +231,8 @@ def run_experiment(config,prep_function):
     :return: nothing
     """
 
+    logging.info("Begin train.run_experiment")
+
     # tensorflow setup
     autotune = tf.data.experimental.AUTOTUNE
     prepare_gpus()
@@ -240,7 +247,18 @@ def run_experiment(config,prep_function):
 
     # train
     print('Begin training')
+    logging.info('Begin training')
     model = create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_per_epoch, config)
+    logging.info('Finished training')
+    summary = model.summary()
+    print(type(summary))
+    print(summary)
+    summary_file = open(config['log_folder'] + "/model_summary.txt", "w")
+    summary_file.write(str(summary))
+    summary_file.write("\n")
+    summary_file.close()
+    print("Summarizing model is successful")
+
 
     # compute and save validation scores
     postprocess = get_postprocess(config['postprocess'])
