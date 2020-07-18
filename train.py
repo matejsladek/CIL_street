@@ -11,7 +11,7 @@ import tensorflow as tf
 import datetime, os
 import logging
 from tensorflow.keras.layers import *
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
 from tensorflow.keras.optimizers import Adam
 
 from code.preprocessing import *
@@ -128,7 +128,7 @@ def get_model(config):
                     input_shape=(config['img_resize'], config['img_resize'], config['n_channels']),
                     encoder_weights=encoder_weights, encoder_freeze=False,
                     predict_distance=config['predict_distance'], predict_contour=config['predict_contour'],
-                    aspp=config['aspp'], se=config['se'], residual=config['residual'])
+                    aspp=config['aspp'], se=config['se'], residual=config['residual'], art=config['art'])
 
     if config['augment_loss']:
         config['loss'][0] = custom_loss
