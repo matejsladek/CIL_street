@@ -141,7 +141,7 @@ def __decoder_block_res(x,block_idx,decoder_filters,skips,se):
     return x
 
 
-def __decoder_block_art(input_tensor,block_idx,decoder_filters,skips,se):
+def __decoder_block_art(input_tensor,block_idx,decoder_filters,skips):
     i = block_idx
     filters = decoder_filters[i]
     cardinality = 32
