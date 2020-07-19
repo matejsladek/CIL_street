@@ -5,20 +5,27 @@
 import tensorflow as tf
 from tensorflow.keras.layers import *
 from classification_models.tfkeras import Classifiers
+import logging
 
+def slice_tensor(x, start, stop, axis):
+    if axis == 3:
+        return x[:, :, :, start:stop]
+    elif axis == 1:
+        return x[:, start:stop, :, :]
+    else:
+        raise ValueError("Slice axis should be in (1, 3), got {}.".format(axis))
 
-def GroupConv2D(filters,
-                kernel_size,
-                strides=(1, 1),
-                groups=32,
-                kernel_initializer='he_uniform',
-                use_bias=True,
-                activation='linear',
-                padding='valid',):
+def GroupConv2D(filters_in,filters_out,
+                kernel_size,strides=(1, 1),groups=32,
+                kernel_initializer='he_uniform',use_bias=True,
+                activation='linear',padding='valid'):
 
     def layer(input_tensor):
-        inp_ch = int(backend.int_shape(input_tensor)[-1] // groups)  # input grouped channels
-        out_ch = int(filters // groups)  # output grouped channels
+        inp_ch = filters_in
+        out_ch = filters_out
+        slice_axis=3
+        #inp_ch = int(backend.int_shape(input_tensor)[-1] // groups)  # input grouped channels
+        #out_ch = int(filters // groups)  # output grouped channels
 
         blocks = []
         for c in range(groups):
@@ -27,8 +34,8 @@ def GroupConv2D(filters,
                 'stop': (c + 1) * inp_ch,
                 'axis': slice_axis,
             }
-            x = layers.Lambda(slice_tensor, arguments=slice_arguments)(input_tensor)
-            x = layers.Conv2D(out_ch,
+            x = Lambda(slice_tensor, arguments=slice_arguments)(input_tensor)
+            x = Conv2D(out_ch,
                               kernel_size,
                               strides=strides,
                               kernel_initializer=kernel_initializer,
@@ -36,8 +43,7 @@ def GroupConv2D(filters,
                               activation=activation,
                               padding=padding)(x)
             blocks.append(x)
-
-        x = layers.Concatenate(axis=slice_axis)(blocks)
+        x = Concatenate(axis=slice_axis)(blocks)
         return x
     return layer
 
@@ -105,48 +111,53 @@ def __decoder_block_res(x,block_idx,decoder_filters,skips,se):
     filters = decoder_filters[i]
     print(filters)
 
-    x = UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(x)
+    r = UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(x)
     # skip connection
     if i < len(skips):
-        x = Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([x, skips[i]])
+        r = Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([r, skips[i]])
 
-    r = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False,
-            kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(x)
-    r = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(r)
-    r = Activation('relu', name='decoder_stage{}a_activation'.format(i))(r)
+    x = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False,
+            kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(r)
+    x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
+    x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
 
     # Squeeze and Excitation on the first convolution
     if se:
-        w = GlobalAveragePooling2D(name='decoder_stage{}a_se_avgpool'.format(i))(r)
+        w = GlobalAveragePooling2D(name='decoder_stage{}a_se_avgpool'.format(i))(x)
         w = Dense(filters // 8, activation='relu', name='decoder_stage{}a_se_dense1'.format(i))(w)
         w = Dense(filters, activation='sigmoid', name='decoder_stage{}a_se_dense2'.format(i))(w)
-        r = Multiply(name='decoder_stage{}a_se_mult'.format(i))([r, w])
+        x = Multiply(name='decoder_stage{}a_se_mult'.format(i))([x, w])
 
-    r = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False,
-            kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(r)
-    r = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(r)
-    r = Activation('relu', name='decoder_stage{}b_activation'.format(i))(r)
+    x = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False,
+            kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
+    x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
+    x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
 
     # Squeeze and Excitation on the second convolution
     if se:
-        w = GlobalAveragePooling2D(name='decoder_stage{}b_se_avgpool'.format(i))(r)
+        w = GlobalAveragePooling2D(name='decoder_stage{}b_se_avgpool'.format(i))(x)
         w = Dense(filters // 8, activation='relu', name='decoder_stage{}b_se_dense1'.format(i))(w)
         w = Dense(filters, activation='sigmoid', name='decoder_stage{}b_se_dense2'.format(i))(w)
-        r = Multiply(name='decoder_stage{}b_se_mult'.format(i))([r, w])
+        x = Multiply(name='decoder_stage{}b_se_mult'.format(i))([x, w])
 
-    x = Conv2D(filters=filters, kernel_size=1, padding='same', use_bias=False,
-            kernel_initializer='he_uniform', name='decoder_stage{}sk_conv'.format(i))(x)
-    x = BatchNormalization(axis=3, name='decoder_stage{}sk_bn'.format(i))(x)
-    x = Add(name='decoder_stage{}_add'.format(i))([r,x])
+    r = Conv2D(filters=filters, kernel_size=1, padding='same', use_bias=False,
+            kernel_initializer='he_uniform', name='decoder_stage{}sk_conv'.format(i))(r)
+    r = BatchNormalization(axis=3, name='decoder_stage{}sk_bn'.format(i))(r)
+    x = Add(name='decoder_stage{}_add'.format(i))([x,r])
     return x
 
 
 def __decoder_block_art(input_tensor,block_idx,decoder_filters,skips):
+    print("inside decoder_block_art")
     i = block_idx
     filters = decoder_filters[i]
     cardinality = 32
     base_width = 4
-    width = (filters // 4) * base_width * cardinality // 64
+    #width = (filters // 4) * base_width * cardinality // 64
+    width = max(filters*2,cardinality)
+    print("width")
+    print(width)
+    logging.info("decoder_block_art width=%s"%(str(width)))
 
     r = UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(input_tensor)
     # skip connection
@@ -158,9 +169,10 @@ def __decoder_block_art(input_tensor,block_idx,decoder_filters,skips):
     x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
     x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
 
-    x = layers.ZeroPadding2D(1)(x) #required due to custom GroupConv2D method
-    x = GroupConv2D(filters=width, kernel_size=(3, 3), strides=1, groups=cardinality,
-                        kernel_initializer='he_uniform', use_bias=False)(x)
+    x = ZeroPadding2D(1)(x) #required due to custom GroupConv2D method
+    x = GroupConv2D(filters_in=width//cardinality, filters_out=width//cardinality,
+            kernel_size=(3, 3), strides=1, groups=cardinality,
+            kernel_initializer='he_uniform', use_bias=False)(x)
     x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
     x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
 
@@ -175,11 +187,142 @@ def __decoder_block_art(input_tensor,block_idx,decoder_filters,skips):
     x = Add(name='decoder_stage{}_add'.format(i))([x,r])
     return x
 
+def __decoder_block_A(input_tensor,block_idx,decoder_filters,skips,residual,art,se):
+    #3x3,3x3 with all possible res,art,se
+    #close to best_model
+
+    i = block_idx
+    filters = decoder_filters[i]
+
+    if art:
+        print("inside decoder_block_art")
+        cardinality = 32
+        base_width = 4
+        #width = (filters // 4) * base_width * cardinality // 64
+        width = max(filters*2,cardinality)
+        print("width")
+        print(width)
+        logging.info("decoder_block_art width=%s"%(str(width)))
+
+    r = UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(input_tensor)
+    # skip connection
+    if i < len(skips):
+        r = Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([r, skips[i]])
+
+    x = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False,
+            kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(r)
+    x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
+    x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
+
+    # Squeeze and Excitation on the first convolution
+    if se:
+        w = GlobalAveragePooling2D(name='decoder_stage{}a_se_avgpool'.format(i))(x)
+        w = Dense(filters // 8, activation='relu', name='decoder_stage{}a_se_dense1'.format(i))(w)
+        w = Dense(filters, activation='sigmoid', name='decoder_stage{}a_se_dense2'.format(i))(w)
+        x = Multiply(name='decoder_stage{}a_se_mult'.format(i))([x, w])
+
+    if art:
+        x = ZeroPadding2D(1)(x) #required due to custom GroupConv2D method
+        x = GroupConv2D(filters_in=width//cardinality, filters_out=width//cardinality,
+                kernel_size=(3, 3), strides=1, groups=cardinality,
+                kernel_initializer='he_uniform', use_bias=False)(x)
+        x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
+        x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
+
+        x = Conv2D(filters=filters, kernel_size=1, padding='same', use_bias=False,
+                kernel_initializer='he_uniform', name='decoder_stage{}c_conv'.format(i))(x)
+        x = BatchNormalization(axis=3, name='decoder_stage{}c_bn'.format(i))(x)
+        x = Activation('relu', name='decoder_stage{}c_activation'.format(i))(x)
+
+    else:
+        x = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False,
+                kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
+        x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
+        x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
+
+    # Squeeze and Excitation on the second convolution
+    if se:
+        w = GlobalAveragePooling2D(name='decoder_stage{}b_se_avgpool'.format(i))(x)
+        w = Dense(filters // 8, activation='relu', name='decoder_stage{}b_se_dense1'.format(i))(w)
+        w = Dense(filters, activation='sigmoid', name='decoder_stage{}b_se_dense2'.format(i))(w)
+        x = Multiply(name='decoder_stage{}b_se_mult'.format(i))([x, w])
+
+    if residual:
+        r = Conv2D(filters=filters, kernel_size=1, padding='same', use_bias=False,
+                kernel_initializer='he_uniform', name='decoder_stage{}sk_conv'.format(i))(r)
+        r = BatchNormalization(axis=3, name='decoder_stage{}sk_bn'.format(i))(r)
+        r = Activation('relu', name='decoder_stage{}sk_activation'.format(i))(r)
+        x = Add(name='decoder_stage{}_add'.format(i))([x,r])
+
+    return x
+
+
+def __decoder_block_B(input_tensor,block_idx,decoder_filters,skips,residual,art,se):
+    #1x1,3x3, 1x1 with all possible res,art,se
+    #close to best_model
+
+    i = block_idx
+    filters = decoder_filters[i]
+    mid_filters = filters//2
+
+    if art:
+        print("inside decoder_block_art")
+        cardinality = 32
+        base_width = 4
+        #width = (filters // 4) * base_width * cardinality // 64
+        width = max(mid_filters*2,cardinality)
+        print("width")
+        print(width)
+        logging.info("decoder_block_art width=%s"%(str(width)))
+
+    r = UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(input_tensor)
+    # skip connection
+    if i < len(skips):
+        r = Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([r, skips[i]])
+
+    x = Conv2D(filters=mid_filters, kernel_size=1, padding='same', use_bias=False,
+            kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(r)
+    x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
+    x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
+
+    if art:
+        x = ZeroPadding2D(1)(x) #required due to custom GroupConv2D method
+        x = GroupConv2D(filters_in=width//cardinality, filters_out=width//cardinality,
+                kernel_size=(3, 3), strides=1, groups=cardinality,
+                kernel_initializer='he_uniform', use_bias=False)(x)
+        x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
+        x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
+    else:
+        x = Conv2D(filters=mid_filters, kernel_size=3, padding='same', use_bias=False,
+                kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
+        x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
+        x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
+
+    x = Conv2D(filters=filters, kernel_size=1, padding='same', use_bias=False,
+            kernel_initializer='he_uniform', name='decoder_stage{}c_conv'.format(i))(x)
+    x = BatchNormalization(axis=3, name='decoder_stage{}c_bn'.format(i))(x)
+    x = Activation('relu', name='decoder_stage{}c_activation'.format(i))(x)
+
+    if se:
+        w = GlobalAveragePooling2D(name='decoder_stage{}a_se_avgpool'.format(i))(x)
+        w = Dense(filters // 8, activation='relu', name='decoder_stage{}a_se_dense1'.format(i))(w)
+        w = Dense(filters, activation='sigmoid', name='decoder_stage{}a_se_dense2'.format(i))(w)
+        x = Multiply(name='decoder_stage{}a_se_mult'.format(i))([x, w])
+
+    if residual:
+        r = Conv2D(filters=filters, kernel_size=1, padding='same', use_bias=False,
+                kernel_initializer='he_uniform', name='decoder_stage{}sk_conv'.format(i))(r)
+        r = BatchNormalization(axis=3, name='decoder_stage{}sk_bn'.format(i))(r)
+        r = Activation('relu', name='decoder_stage{}sk_activation'.format(i))(r)
+        x = Add(name='decoder_stage{}_add'.format(i))([x,r])
+
+    return x
 
 
 def RoadNet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_weights='imagenet',
             encoder_freeze=False, predict_distance=False, predict_contour=False,
-            aspp=False, se=False, residual=False, art=False):
+            aspp=False, se=False, residual=False, art=False, 
+            experimental_decoder=False,decoder_exp_setting=None):
     """
     Encoder-decoder based architecture for road segmentation in aerial images.
 
@@ -240,7 +383,9 @@ def RoadNet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_we
         x = BatchNormalization(axis=3, name='aspp_concat_bn')(x)
         x = Activation('relu', name='aspp_concat_relu')(x)
 
-    if residual or art:
+    bridge=False
+    #if residual or art:
+    if bridge:
         #input 12,12,2048 seresnext101
         #filters = np.shape(skips[0].get_weights())[-1]
         if backbone_name == 'seresnext101':
@@ -260,17 +405,38 @@ def RoadNet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_we
         #x = Add(name='residual_bridge_add')([x,b])
         #output 12,12,1024
 
-
-    # create the decoder blocks sequentially
-    for i in range(n_blocks):
-        if art:
-            x = __decoder_block_art(x,i,decoder_filters,skips)
-        elif residual:
-            x = __decoder_block_res(x,i,decoder_filters,skips,se)
-        elif se:
-            x = __decoder_block_se(x,i,decoder_filters,skips)
+    exp_setting = decoder_exp_setting
+    if experimental_decoder:
+        if exp_setting=="A":
+            decoder_filters = (256, 128, 64, 32, 16)
+            n_blocks = len(decoder_filters)
+            for i in range(n_blocks):
+                x = __decoder_block_A(x,i,decoder_filters,skips,
+                        residual,art,se)
+        elif exp_setting=="B":
+            decoder_filters = (256, 128, 64, 32, 16)
+            n_blocks = len(decoder_filters)
+            for i in range(n_blocks):
+                x = __decoder_block_B(x,i,decoder_filters,skips,
+                        residual,art,se)
+        elif exp_setting=="C":
+            decoder_filters = (512, 256, 64, 32, 16)
+            n_blocks = len(decoder_filters)
+            for i in range(n_blocks):
+                x = __decoder_block_A(x,i,decoder_filters,skips,
+                        residual,art,se)
+        elif exp_setting=="D":
+            decoder_filters = (512, 256, 64, 32, 16)
+            n_blocks = len(decoder_filters)
+            for i in range(n_blocks):
+                x = __decoder_block_B(x,i,decoder_filters,skips,
+                        residual,art,se)
         else:
-            x = __decoder_block_unet(x,i,decoder_filters,skips)
+            raise(Exception)
+    # create the decoder blocks sequentially
+    else:
+        for i in range(n_blocks):
+            x = __decoder_block_se(x,i,decoder_filters,skips)
 
     task1 = Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_mask')(x)
     task1 = Activation('sigmoid', name='final_activation_mask')(task1)

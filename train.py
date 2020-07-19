@@ -13,6 +13,7 @@ import logging
 from tensorflow.keras.layers import *
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
 from tensorflow.keras.optimizers import Adam
+import shutil
 
 from code.preprocessing import *
 from code.postprocessing import *
@@ -97,6 +98,8 @@ def get_dataset(config, autotune):
     # select dataset root according to its name
     if config['dataset'] == 'original':
         training_data_root = "data/original/training/images/"
+    elif config['dataset'] == 'maps1800_all':
+        all_data_root = "data/maps1800/all/images/"
     else:
         raise Exception('Unrecognised dataset')
     val_data_root = training_data_root.replace('training', 'validation')
@@ -128,7 +131,9 @@ def get_model(config):
                     input_shape=(config['img_resize'], config['img_resize'], config['n_channels']),
                     encoder_weights=encoder_weights, encoder_freeze=False,
                     predict_distance=config['predict_distance'], predict_contour=config['predict_contour'],
-                    aspp=config['aspp'], se=config['se'], residual=config['residual'], art=config['art'])
+                    aspp=config['aspp'], se=config['se'], residual=config['residual'], art=config['art'],
+                    experimental_decoder=config['experimental_decoder'],
+                    decoder_exp_setting=config['decoder_exp_setting'])
 
     if config['augment_loss']:
         config['loss'][0] = custom_loss
@@ -305,6 +310,14 @@ def run_experiment(config,prep_function):
     # save predictions as csv files for simple submission
     to_csv(pred_test_path, os.path.join(config['log_folder'], 'pred_submission.csv'))
     to_csv(postprocess_test_path, os.path.join(config['log_folder'],'postprocess_submission.csv'))
+
+    if not(config['save_model']):
+        if os.path.exists( os.path.join(config['log_folder'],'best_model.h5') ):
+            os.remove( os.path.join(config['log_folder'],'best_model.h5') )
+
+    if config['use_cv']:
+        if os.path.exists( config['tmp']['tmp_cv_data_folder'] ):
+            shutil.rmtree( config['tmp']['tmp_cv_data_folder'] )
 
     print('Finished ' + config['name'])
 

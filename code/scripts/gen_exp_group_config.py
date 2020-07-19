@@ -3,14 +3,19 @@ import os
 import argparse
 import shutil
 
-project_dir = ""
+
+project_dir = os.path.join(*[os.path.dirname(os.path.abspath(__file__)),"..",".."])
+"""
 internal_baseline_path = os.path.join(*[project_dir,"config_archive","internal_baseline.json"])
 internal_baseline = json.loads(open(internal_baseline_path,'r').read())
 
 good_model_path = os.path.join(*[project_dir,"config_archive","good_model_0707.json"])
 good_model = json.loads(open(good_model_path,'r').read())
+"""
 
-best_model_path = os.path.join(*[project_dir,"config_archive","best_model_0707.json"])
+best_model_path = os.path.join(*[project_dir,"baseline_configs","best_model_1807.json"])
+#best_model_path = os.path.join(*[project_dir,"baseline_configs","debug_best_model_1807.json"])
+#best_model_path = os.path.join(*[project_dir,"config_archive","best_model_0707.json"])
 best_model = json.loads(open(best_model_path,'r').read())
 
 
@@ -24,6 +29,70 @@ def diff_to_conf(base,exp_diff_list,exp_group_diff):
             config_tmp[k] = v
         config_list.append(config_tmp)
     return(config_list)
+
+
+def gen_decoders1907A_configs(base):
+#    exp_group_name = 'decoders1907A_debug'
+    exp_group_name = 'decoders1907A_maps1800'
+    exp_group_diff = {
+            'name':os.path.join(exp_group_name,'exp'),
+            'experimental_decoder':True,
+            'decoder_exp_setting':'A',
+            'cv_k_todo':1
+            }
+    exp_diff_list = [
+            {'residual':False,'art':False,'se':False},
+            {'residual':True,'art':False,'se':False},
+            {'residual':False,'art':True,'se':False},
+            {'residual':False,'art':False,'se':True},
+            {'residual':False,'art':True,'se':True},
+            {'residual':True,'art':True,'se':True},
+            {'experimental_decoder':False}
+            ]
+    config_list = diff_to_conf(base,exp_diff_list,exp_group_diff)
+    return config_list
+
+def gen_decoders1907B_configs(base):
+#    exp_group_name = 'decoders1907B_debug'
+    exp_group_name = 'decoders1907B_maps1800'
+    exp_group_diff = {
+            'name':os.path.join(exp_group_name,'exp'),
+            'experimental_decoder':True,
+            'decoder_exp_setting':'B',
+            'cv_k_todo':1
+            }
+    exp_diff_list = [
+            {'residual':False,'art':False,'se':False},
+            {'residual':True,'art':False,'se':False},
+            {'residual':False,'art':True,'se':False},
+            {'residual':False,'art':False,'se':True},
+            {'residual':False,'art':True,'se':True},
+            {'residual':True,'art':True,'se':True},
+            {'experimental_decoder':False}
+            ]
+    config_list = diff_to_conf(base,exp_diff_list,exp_group_diff)
+    return config_list
+
+def gen_decoders1907C_configs(base):
+#    exp_group_name = 'decoders1907B_debug'
+    exp_group_name = 'decoders1907C_maps1800'
+    exp_group_diff = {
+            'name':os.path.join(exp_group_name,'exp'),
+            'experimental_decoder':True,
+            'decoder_exp_setting':'C',
+            'cv_k_todo':1
+            }
+    exp_diff_list = [
+            {'residual':False,'art':False,'se':False},
+            {'residual':True,'art':False,'se':False},
+            {'residual':False,'art':True,'se':False},
+            {'residual':False,'art':False,'se':True},
+            {'residual':False,'art':True,'se':True},
+            {'residual':True,'art':True,'se':True},
+            {'experimental_decoder':False}
+            ]
+    config_list = diff_to_conf(base,exp_diff_list,exp_group_diff)
+    return config_list
 
 
 #official
@@ -103,6 +172,7 @@ if __name__=="__main__":
     print(argsdict)
 
 
+    ###
     if argsdict['exp_group'] == 'table1':
         config_list = gen_table1_configs(good_model)
     elif argsdict['exp_group'] == 'table2':
@@ -110,6 +180,19 @@ if __name__=="__main__":
     elif argsdict['exp_group'] == 'opt_lw':
         config_list = gen_opt_lw_configs(good_model)
 
+    elif argsdict['exp_group'] == '1907A_debug':
+        config_list = gen_decoders1907A_configs(best_model)
+    elif argsdict['exp_group'] == '1907A':
+        config_list = gen_decoders1907A_configs(best_model)
+    elif argsdict['exp_group'] == '1907B_debug':
+        config_list = gen_decoders1907B_configs(best_model)
+    elif argsdict['exp_group'] == '1907B':
+        config_list = gen_decoders1907B_configs(best_model)
+    elif argsdict['exp_group'] == '1907C':
+        config_list = gen_decoders1907C_configs(best_model)
+    elif argsdict['exp_group'] == '1907D':
+        config_list = gen_decoders1907D_configs(best_model)
+    ###
 
     exp_group_config_path = os.path.join(project_dir,'config_'+argsdict['exp_group'])
     if os.path.exists(exp_group_config_path):
