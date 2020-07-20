@@ -65,7 +65,11 @@ def __decoder_block_A(input_tensor,block_idx,decoder_filters,skips,residual,art,
     if i < len(skips):
         r = Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([r, skips[i]])
 
-    x = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False,
+    if art:
+        x = Conv2D(filters=width, kernel_size=3, padding='same', use_bias=False,
+            kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(r)
+    else:
+        x = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False,
             kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(r)
     x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
     x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
@@ -128,7 +132,11 @@ def __decoder_block_B(input_tensor,block_idx,decoder_filters,skips,residual,art,
     if i < len(skips):
         r = Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([r, skips[i]])
 
-    x = Conv2D(filters=mid_filters, kernel_size=1, padding='same', use_bias=False,
+    if art:
+        x = Conv2D(filters=width, kernel_size=1, padding='same', use_bias=False,
+            kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(r)
+    else:
+        x = Conv2D(filters=mid_filters, kernel_size=1, padding='same', use_bias=False,
             kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(r)
     x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
     x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
