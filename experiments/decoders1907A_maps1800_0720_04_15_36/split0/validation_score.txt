@@ -1,0 +1,7 @@
+Validation results
+Results of model.evaluate: 
+[0.17367530057304784, 0.1344291, 0.19696562, 0.95854706, 0.96433336, 0.85510063, 0.7475097, 0.92520857, 0.9510274, 0.690315, 0.5273423]
+Kaggle metric on predictions: 
+0.9644126
+Kaggle metric on predictions after post processing: 
+0.82173055
