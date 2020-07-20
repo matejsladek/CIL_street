@@ -46,8 +46,8 @@ def morphological_postprocessing(imgs):
     for img in imgs:
         kernel = np.ones((3,3), np.uint8)
         _, img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
-        img = cv2.erode(img, kernel, iterations=7)
-        img = cv2.dilate(img, kernel, iterations=7)
+        img = cv2.erode(img, kernel, iterations=6)
+        img = cv2.dilate(img, kernel, iterations=6)
         out.append(img)
     out = np.expand_dims(np.stack(out), -1)
     return out
