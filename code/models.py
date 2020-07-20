@@ -77,8 +77,12 @@ def __decoder_block_A(input_tensor,block_idx,decoder_filters,skips,residual,art,
     # Squeeze and Excitation on the first convolution
     if se:
         w = GlobalAveragePooling2D(name='decoder_stage{}a_se_avgpool'.format(i))(x)
-        w = Dense(filters // 8, activation='relu', name='decoder_stage{}a_se_dense1'.format(i))(w)
-        w = Dense(filters, activation='sigmoid', name='decoder_stage{}a_se_dense2'.format(i))(w)
+        if art:
+            w = Dense(width // 8, activation='relu', name='decoder_stage{}a_se_dense1'.format(i))(w)
+            w = Dense(width, activation='sigmoid', name='decoder_stage{}a_se_dense2'.format(i))(w)
+        else:
+            w = Dense(filters // 8, activation='relu', name='decoder_stage{}a_se_dense1'.format(i))(w)
+            w = Dense(filters, activation='sigmoid', name='decoder_stage{}a_se_dense2'.format(i))(w)
         x = Multiply(name='decoder_stage{}a_se_mult'.format(i))([x, w])
 
     if art:
