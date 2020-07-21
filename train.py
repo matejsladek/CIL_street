@@ -285,6 +285,12 @@ def run_experiment(config,prep_function):
         out_file.write(str(kaggle_metric(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y[0], [config['img_size'], config['img_size']])).numpy()))
     else:
         out_file.write(str(kaggle_metric(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
+        out_file.write("\nAccuracy, F1 and IoU after post processing: \n")
+        out_file.write(str(tf.keras.backend.mean(postprocessed_predictions == tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
+        out_file.write('\n')
+        out_file.write(str(f1_m(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
+        out_file.write('\n')
+        out_file.write(str(iou(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
     out_file.write('\n')
     out_file.close()
     print('Validation is successful')
