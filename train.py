@@ -5,15 +5,17 @@
 # -----------------------------------------------------------
 import json
 import argparse
+import sys
 from glob import glob
-import numpy as np
-import tensorflow as tf
 import datetime, os
 import logging
+import shutil
+import numpy as np
+import random
+import tensorflow as tf
 from tensorflow.keras.layers import *
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
 from tensorflow.keras.optimizers import Adam
-import shutil
 
 from code.preprocessing import *
 from code.postprocessing import *
@@ -57,32 +59,22 @@ def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
                                               v_flip=config['v_flip'],
                                               rot=config['rot'],
                                               contrast=config['contrast'],
-                                              brightness=config['brightness'],
-                                              predict_contour=config['predict_contour'],
-                                              predict_distance=config['predict_distance'])
+                                              brightness=config['brightness'])
     train_dataset = train_dataset.map(train_image_loader, num_parallel_calls=autotune)
     train_dataset = train_dataset.repeat().shuffle(buffer_size=config['buffer_size'], seed=config['seed'])\
         .batch(config['batch_size']).prefetch(buffer_size=autotune)
 
     val_dataset = tf.data.Dataset.list_files(val_data_glob, shuffle=False, seed=config['seed'])
     val_dataset = val_dataset.map(get_parse_image(hard=config['hard_mask']))
-    val_image_loader = get_load_image_val(size=config['img_resize'], normalize=config['normalize'],
-                                          predict_contour=config['predict_contour'],
-                                          predict_distance=config['predict_distance'])
+    val_image_loader = get_load_image_val(size=config['img_resize'], normalize=config['normalize'])
     val_dataset = val_dataset.map(val_image_loader)
     val_dataset = val_dataset.batch(config['batch_size']).prefetch(buffer_size=autotune)
 
     # prepare numpy copy of validation set
     val_dataset_copy = val_dataset
     val_dataset_copy = list(val_dataset_copy)
-    if config['predict_contour'] or config['predict_distance']:
-        val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_copy])
-        val_dataset_numpy_y_mask = np.concatenate([b[0].numpy()[:, ...] for a,b in val_dataset_copy])
-        val_dataset_numpy_y_new_task = np.concatenate([b[1].numpy()[:, ...] for a,b in val_dataset_copy])
-        val_dataset_numpy_y = (val_dataset_numpy_y_mask, val_dataset_numpy_y_new_task)
-    else:
-        val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_copy])
-        val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_copy])
+    val_dataset_numpy_x = np.concatenate([a.numpy()[:, ...] for a,b in val_dataset_copy])
+    val_dataset_numpy_y = np.concatenate([b.numpy()[:, ...] for a,b in val_dataset_copy])
     val_dataset_numpy = (val_dataset_numpy_x, val_dataset_numpy_y)
 
     return train_dataset, val_dataset, val_dataset_numpy
@@ -97,21 +89,21 @@ def get_dataset(config, autotune):
     """
     # select dataset root according to its name
     if config['dataset'] == 'original':
-        training_data_root = "data/original/training/images/"
+        all_data_root = "data/original/all/images/"
     elif config['dataset'] == 'maps1800_all':
         all_data_root = "data/maps1800/all/images/"
     else:
         raise Exception('Unrecognised dataset')
-    val_data_root = training_data_root.replace('training', 'validation')
 
-    training_data_glob = glob.glob(training_data_root + "*.png")
-    val_data_glob = glob.glob(val_data_root + "*.png")
-    trainset_size = len(training_data_glob)
-    valset_size = len(val_data_glob)
+    all_data_glob = glob.glob(all_data_root + "*.png")
+
+    random.seed(config['seed'])
+    val_data_glob = random.sample(all_data_glob, int(len(all_data_glob)*config['val_split']))
+    training_data_glob = [sample for sample in all_data_glob if sample not in val_data_glob]
 
     train_dataset, val_dataset, val_dataset_numpy = get_dataset_from_path(training_data_glob, val_data_glob, config, autotune)
 
-    return train_dataset, val_dataset, val_dataset_numpy, trainset_size, valset_size, training_data_root, val_data_root
+    return train_dataset, val_dataset, val_dataset_numpy, training_data_glob, val_data_glob
 
 
 def get_model(config):
@@ -130,26 +122,13 @@ def get_model(config):
     model = RoadNet(backbone_name=config['backbone'],
                     input_shape=(config['img_resize'], config['img_resize'], config['n_channels']),
                     encoder_weights=encoder_weights, encoder_freeze=False,
-                    predict_distance=config['predict_distance'], predict_contour=config['predict_contour'],
-                    aspp=config['aspp'], se=config['se'], residual=config['residual'], art=config['art'],
-                    experimental_decoder=config['experimental_decoder'],
-                    decoder_exp_setting=config['decoder_exp_setting'])
+                    aspp=config['aspp'], se=config['se'], residual=config['residual'], art=config['art'])
 
     if config['augment_loss']:
-        config['loss'][0] = custom_loss
+        config['loss'] = custom_loss
 
-    if config['predict_distance'] and config['predict_contour']:
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'],
-                      loss_weights=config['loss_weights'], metrics=['accuracy', kaggle_metric, f1_m, iou])
-    elif config['predict_distance']:
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=[config['loss'][0],config['loss'][2]],
-                      loss_weights=[config['loss_weights'][0],config['loss_weights'][2]], metrics=['accuracy', kaggle_metric, f1_m, iou])
-    elif config['predict_contour']:
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0:2],
-                      loss_weights=config['loss_weights'][0:2], metrics=['accuracy', kaggle_metric, f1_m, iou])
-    else:
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'][0],
-                      metrics=['accuracy', kaggle_metric, f1_m, iou])
+    model.compile(optimizer=Adam(learning_rate=learning_rate), loss=config['loss'],
+                  metrics=['accuracy', kaggle_metric, f1_m, iou])
 
     return model
 
@@ -175,22 +154,15 @@ def create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_
             self.lowest_loss = 100
             self.highest_metric = 0
 
-            # select correct index of model.evaluate() result according to config
-            self.metric_index = 2
-            self.loss_index = 0
-            if config['predict_contour'] or config['predict_distance']:
-                self.metric_index = -3
-                self.loss_index = 1
-
         def on_epoch_end(self, epoch, logs=None):
             ev = model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)
             print('\nValidation metrics: ' + str(ev) + '\n')
-            if ev[self.loss_index] < self.lowest_loss and not config['stop_on_metric']:
+            if ev[0] < self.lowest_loss and not config['stop_on_metric']:
                 self.lowest_loss = ev[self.loss_index]
                 print('\nNew lowest loss. Saving weights.\n')
                 model.save_weights(config['log_folder'] + '/best_model.h5')
 
-            if ev[self.metric_index] > self.highest_metric and config['stop_on_metric']:
+            if ev[2] > self.highest_metric and config['stop_on_metric']:
                 self.highest_metric = ev[self.metric_index]
                 print('New best metric. Saving weights.')
                 model.save_weights(config['log_folder'] + '/best_model.h5')
@@ -200,17 +172,15 @@ def create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_
     if config['custom_callback']:
         callbacks.append(CustomCallback())
     else:
-        # only supports single task learning
         callbacks.append(tf.keras.callbacks.ModelCheckpoint(config['log_folder'] + '/best_model.h5',
                                                             monitor='val_kaggle_metric' and config['stop_on_metric'] or 'val_loss',
                                                             verbose=1,
                                                             save_best_only=True,
                                                             save_weights_only=True))
 
-    csv_logger = CSVLogger(os.path.join(config['log_folder'],'train_log.csv'), append=True, separator=';')
+    csv_logger = CSVLogger(os.path.join(config['log_folder'], 'train_log.csv'), append=True, separator=';')
     callbacks.append(csv_logger)
-    logging.info("no. callbacks: %d"%(len(callbacks)))
-    logging.info(str(callbacks))
+
     # train model
     model_history = model.fit(train_dataset, epochs=config['epochs'],
                               steps_per_epoch=steps_per_epoch,
@@ -223,77 +193,41 @@ def create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_
     return model
 
 
-def prep_experiment(config,autotune):
-    print('Load dataset for ' + config['name'])
-    return get_dataset(config, autotune)
-
-
-def run_experiment(config,prep_function):
+def validate(model, val_dataset_numpy):
     """
-    Trains and evaluates a model before computing and saving test predictions, all according to the config file.
-    :param config: config dictionary
-    :param prep_function: data loader
+    Computes and saves validation scores for the model
+
+    :param model: model after training
+    :param val_dataset_numpy: 3D numpy array containing validation data
     :return: nothing
     """
-
-    logging.info("Begin train.run_experiment")
-
-    # tensorflow setup
-    autotune = tf.data.experimental.AUTOTUNE
-    prepare_gpus()
-
-    # retrieve datasets
-    train_dataset, val_dataset, val_dataset_numpy,\
-    trainset_size, valset_size, training_data_root, val_data_root = prep_function(config,autotune)
     val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
-    print(f"Training dataset contains {trainset_size} images.")
-    print(f"Validation dataset contains {valset_size} images.")
-    steps_per_epoch = max(trainset_size // config['batch_size'], 1)
-
-    # train
-    print('Begin training')
-    logging.info('Begin training')
-    model = create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_per_epoch, config)
-    logging.info('Finished training')
-    summary = model.summary()
-    print(type(summary))
-    print(summary)
-    summary_file = open(config['log_folder'] + "/model_summary.txt", "w")
-    summary_file.write(str(summary))
-    summary_file.write("\n")
-    summary_file.close()
-    print("Summarizing model is successful")
-
-
-    # compute and save validation scores
+    val_dataset_numpy_y_resized = tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])
     postprocess = get_postprocess(config['postprocess'])
-    print('Saving validation scores')
+    predictions = tf.image.resize(model.predict(val_dataset_numpy_x), [config['img_size'], config['img_size']])
+    postprocessed_predictions = np.where(postprocess(predictions.numpy()*255)>127, 1, 0).astype(np.float32)
+
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")
-    out_file.write("Validation results\n")
     out_file.write("Results of model.evaluate: \n")
     out_file.write(str(model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)))
     out_file.write("\nKaggle metric on predictions: \n")
-    if config['predict_contour'] or config['predict_distance']:
-        predictions = tf.image.resize(model.predict(val_dataset_numpy_x)[0], [config['img_size'], config['img_size']])
-        out_file.write(str(kaggle_metric(predictions, tf.image.resize(val_dataset_numpy_y[0], [config['img_size'], config['img_size']])).numpy()))
-    else:
-        predictions = tf.image.resize(model.predict(val_dataset_numpy_x), [config['img_size'], config['img_size']])
-        out_file.write(str(kaggle_metric(predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
+    out_file.write(str(kaggle_metric(predictions, val_dataset_numpy_y_resized).numpy()))
     out_file.write("\nKaggle metric on predictions after post processing: \n")
-    postprocessed_predictions = postprocess(predictions.numpy())
-    if config['predict_contour'] or config['predict_distance']:
-        out_file.write(str(kaggle_metric(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y[0], [config['img_size'], config['img_size']])).numpy()))
-    else:
-        out_file.write(str(kaggle_metric(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
-        out_file.write("\nAccuracy, F1 and IoU after post processing: \n")
-        out_file.write(str(tf.keras.backend.mean(postprocessed_predictions == tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
-        out_file.write('\n')
-        out_file.write(str(f1_m(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
-        out_file.write('\n')
-        out_file.write(str(iou(postprocessed_predictions, tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])).numpy()))
-    out_file.write('\n')
+    out_file.write(str(kaggle_metric(postprocessed_predictions, val_dataset_numpy_y_resized).numpy()))
+    out_file.write("\nAccuracy, F1 and IoU after post processing: \n")
+    out_file.write(str(tf.keras.backend.mean(postprocessed_predictions == val_dataset_numpy_y_resized).numpy()) + ' ')
+    out_file.write(str(f1_m(postprocessed_predictions, val_dataset_numpy_y_resized).numpy())+ ' ')
+    out_file.write(str(iou(postprocessed_predictions, val_dataset_numpy_y_resized).numpy())+ ' ')
     out_file.close()
-    print('Validation is successful')
+
+
+def test(model):
+    """
+    Produces and saves predictions on the test set, both as .png images and .csv files
+
+    :param model: fully trained model
+    :return: nothing
+    """
 
     # save predictions on test images
     in_test_path = 'data/test_images'
@@ -304,7 +238,7 @@ def run_experiment(config,prep_function):
     postprocess_test_path = os.path.join(config['log_folder'], "postprocess_test")
     os.mkdir(postprocess_test_path)
 
-    print('Saving predictions')
+    postprocess = get_postprocess(config['postprocess'])
     save_predictions(model=model,
                      crop=True,
                      input_path=in_test_path,
@@ -317,15 +251,145 @@ def run_experiment(config,prep_function):
     to_csv(pred_test_path, os.path.join(config['log_folder'], 'pred_submission.csv'))
     to_csv(postprocess_test_path, os.path.join(config['log_folder'],'postprocess_submission.csv'))
 
+
+def run_experiment(config,prep_function):
+    """
+    Trains and evaluates a model before computing and saving test predictions, all according to the config file.
+    :param config: config dictionary
+    :param prep_function: data loader
+    :return: nothing
+    """
+
+    logging.info("Begin single training run.")
+
+    # tensorflow setup
+    autotune = tf.data.experimental.AUTOTUNE
+    prepare_gpus()
+
+    # retrieve datasets
+    train_dataset, val_dataset, val_dataset_numpy, training_data_glob, val_data_glob = prep_function(config, autotune)
+    logging.info(f"Training dataset contains {len(training_data_glob)} images")
+    logging.info(f"Validation dataset contains {len(val_data_glob)} images")
+    steps_per_epoch = max(len(training_data_glob) // config['batch_size'], 1)
+
+    # train
+    logging.info('Begin training')
+    model = create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_per_epoch, config)
+    logging.info('Finished training')
+
+    logging.info('Validating')
+    validate(model, val_dataset_numpy)
+
+    logging.info('Testing')
+    test(model)
+
     if not(config['save_model']):
-        if os.path.exists( os.path.join(config['log_folder'],'best_model.h5') ):
-            os.remove( os.path.join(config['log_folder'],'best_model.h5') )
+        if os.path.exists(os.path.join(config['log_folder'], 'best_model.h5')):
+            os.remove(os.path.join(config['log_folder'], 'best_model.h5'))
 
-    if config['use_cv']:
-        if os.path.exists( config['tmp']['tmp_cv_data_folder'] ):
-            shutil.rmtree( config['tmp']['tmp_cv_data_folder'] )
+    logging.info('Finished single training run')
 
-    print('Finished ' + config['name'])
+
+def run_experiment_ensemble(config,prep_function):
+    """
+    Trains and evaluates an ensemble of model before computing and saving test predictions, all according to the config file.
+    :param config: config dictionary
+    :param prep_function: data loader
+    :return: nothing
+    """
+
+    # train ensemble of models
+    val_preds = []
+    for i in range(config['n_ensemble']):
+
+        logging.info("Begin single training run.")
+
+        # tensorflow setup
+        autotune = tf.data.experimental.AUTOTUNE
+        prepare_gpus()
+
+        # retrieve datasets
+        train_dataset, val_dataset, val_dataset_numpy, training_data_glob, val_data_glob = prep_function(config, autotune)
+        logging.info(f"Training dataset contains {len(training_data_glob)} images")
+        logging.info(f"Validation dataset contains {len(val_data_glob)} images")
+        steps_per_epoch = max(len(training_data_glob) // config['batch_size'], 1)
+
+        # train
+        logging.info('Begin training')
+        model = create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_per_epoch, config)
+        logging.info('Finished training')
+
+        in_test_path = 'data/test_images'
+        pred_test_path = os.path.join(config['log_folder'], "pred_test") + str(i)
+        os.mkdir(pred_test_path)
+
+        logging.info('Saving predictions')
+        save_predictions(model=model,
+                         crop=True,
+                         input_path=in_test_path,
+                         output_path=pred_test_path,
+                         postprocessed_output_path=None,
+                         config=config,
+                         postprocess=None)
+
+        val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
+        val_dataset_numpy_y_resized = tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])
+        predictions = tf.image.resize(model.predict(val_dataset_numpy_x), [config['img_size'], config['img_size']])
+
+        val_preds.append(predictions)
+
+        if not (config['save_model']):
+            if os.path.exists(os.path.join(config['log_folder'], 'best_model.h5')):
+                os.remove(os.path.join(config['log_folder'], 'best_model.h5'))
+
+        logging.info('Finished single ensemble training run')
+
+        del model
+        logging.info('Finished ' + config['name'] + '/' + str(i))
+        config['seed'] += 1
+
+    val_preds = tf.stack(val_preds)
+    predictions = tf.reduce_mean(val_preds, axis=0)
+    logging.info("Validating")
+    postprocess = get_postprocess(config['postprocess'])
+    postprocessed_predictions = np.where(postprocess(predictions.numpy()*255)>127, 1, 0).astype(np.float32)
+
+    out_file = open(config['log_folder'] + "/validation_score.txt", "w")
+    out_file.write("\nKaggle metric on predictions: \n")
+    out_file.write(str(kaggle_metric(predictions, val_dataset_numpy_y_resized).numpy()))
+    out_file.write("\nAccuracy, F1 and IoU before post processing: \n")
+    out_file.write(str(tf.keras.backend.mean(predictions == val_dataset_numpy_y_resized).numpy()) + '\n')
+    out_file.write(str(f1_m(predictions, val_dataset_numpy_y_resized).numpy())+'\n')
+    out_file.write(str(iou(predictions, val_dataset_numpy_y_resized).numpy())+'\n')
+    out_file.write("\nKaggle metric on predictions after post processing: \n")
+    out_file.write(str(kaggle_metric(postprocessed_predictions, val_dataset_numpy_y_resized).numpy()))
+    out_file.write("\nAccuracy, F1 and IoU after post processing: \n")
+    out_file.write(str(tf.keras.backend.mean(postprocessed_predictions == val_dataset_numpy_y_resized).numpy()) + '\n')
+    out_file.write(str(f1_m(postprocessed_predictions, val_dataset_numpy_y_resized).numpy())+'\n')
+    out_file.write(str(iou(postprocessed_predictions, val_dataset_numpy_y_resized).numpy())+'\n')
+    out_file.close()
+
+    logging.info("Testing")
+    pred_test_ensemble_path = os.path.join(config['log_folder'], "pred_test_ensemble")
+    os.mkdir(pred_test_ensemble_path)
+    postprocess_test_ensemble_path = os.path.join(config['log_folder'], "postprocess_test_ensemble")
+    os.mkdir(postprocess_test_ensemble_path)
+
+    bag(os.path.join(config['log_folder'], "pred_test"), pred_test_ensemble_path, config)
+
+    # apply postprocessing to validation predictions
+    postprocess = get_postprocess(config['postprocess'])
+
+    for img in glob.glob(pred_test_ensemble_path + '/*.png'):
+        im = cv2.imread(img, 0)
+        im = im.astype(np.uint8)
+        im = postprocess(np.expand_dims(im, 0))
+        im = np.squeeze(im)
+        out_path = postprocess_test_ensemble_path + img[len(pred_test_ensemble_path):]
+        cv2.imwrite(out_path, im)
+
+    to_csv(pred_test_ensemble_path, os.path.join(config['log_folder'], 'pred_submission.csv'))
+    to_csv(postprocess_test_ensemble_path, os.path.join(config['log_folder'], 'postprocess_submission.csv'))
 
 
 if __name__ == '__main__':
@@ -335,9 +399,26 @@ if __name__ == '__main__':
     argsdict = vars(args)
 
     # load each config file and run the experiment
-    for config_file in glob.glob( os.path.join(argsdict['config_dir'],"*.json") ):
+    for config_file in glob.glob(os.path.join(argsdict['config_dir'], "*.json")):
         config = json.loads(open(config_file, 'r').read())
         name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
         config['log_folder'] = 'experiments/'+name
         os.makedirs(config['log_folder'])
-        run_experiment(config,prep_experiment)
+
+        cmd = "cp %s %s" % (config_file, config['log_folder'])
+        os.system(cmd)
+
+        logging_path = os.path.join(config['log_folder'], 'train.log')
+        logging.basicConfig(filename=logging_path, filemode='w', format='%(asctime)s - %(name)s - %(message)s', level=logging.INFO)
+        logging.info("Begin logging for single training run")
+        root = logging.getLogger()
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        root.addHandler(handler)
+
+        if not config['use_ensemble']:
+            run_experiment(config, get_dataset)
+        else:
+            run_experiment_ensemble(config, get_dataset)

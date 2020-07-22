@@ -25,7 +25,7 @@ def GroupConv2D(filters_in,filters_out,
     def layer(input_tensor):
         inp_ch = filters_in
         out_ch = filters_out
-        slice_axis=3
+        slice_axis = 3
         #inp_ch = int(backend.int_shape(input_tensor)[-1] // groups)  # input grouped channels
         #out_ch = int(filters // groups)  # output grouped channels
 
@@ -50,7 +50,7 @@ def GroupConv2D(filters_in,filters_out,
     return layer
 
 
-def __decoder_block_A(input_tensor,block_idx,decoder_filters,skips,residual,art,se):
+def _decoder_block(input_tensor, block_idx, decoder_filters, skips, residual, art, se):
     #3x3,3x3 with all possible res,art,se
     #close to best_model
     i = block_idx
@@ -121,68 +121,10 @@ def __decoder_block_A(input_tensor,block_idx,decoder_filters,skips,residual,art,
     return x
 
 
-def __decoder_block_B(input_tensor,block_idx,decoder_filters,skips,residual,art,se):
-    #1x1,3x3, 1x1 with all possible res,art,se
-    i = block_idx
-    filters = decoder_filters[i]
-    mid_filters = filters//2
-
-    if art:
-        cardinality = 32
-        width = max(mid_filters*2,cardinality)
-
-    r = UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(input_tensor)
-    # skip connection
-    if i < len(skips):
-        r = Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([r, skips[i]])
-
-    if art:
-        x = Conv2D(filters=width, kernel_size=1, padding='same', use_bias=False,
-            kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(r)
-    else:
-        x = Conv2D(filters=mid_filters, kernel_size=1, padding='same', use_bias=False,
-            kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(r)
-    x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
-    x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
-
-    if art:
-        x = ZeroPadding2D(1)(x) #required due to custom GroupConv2D method
-        x = GroupConv2D(filters_in=width//cardinality, filters_out=width//cardinality,
-                kernel_size=(3, 3), strides=1, groups=cardinality,
-                kernel_initializer='he_uniform', use_bias=False)(x)
-        x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
-        x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
-    else:
-        x = Conv2D(filters=mid_filters, kernel_size=3, padding='same', use_bias=False,
-                kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
-        x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
-        x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
-
-    x = Conv2D(filters=filters, kernel_size=1, padding='same', use_bias=False,
-            kernel_initializer='he_uniform', name='decoder_stage{}c_conv'.format(i))(x)
-    x = BatchNormalization(axis=3, name='decoder_stage{}c_bn'.format(i))(x)
-    x = Activation('relu', name='decoder_stage{}c_activation'.format(i))(x)
-
-    if se:
-        w = GlobalAveragePooling2D(name='decoder_stage{}a_se_avgpool'.format(i))(x)
-        w = Dense(filters // 8, activation='relu', name='decoder_stage{}a_se_dense1'.format(i))(w)
-        w = Dense(filters, activation='sigmoid', name='decoder_stage{}a_se_dense2'.format(i))(w)
-        x = Multiply(name='decoder_stage{}a_se_mult'.format(i))([x, w])
-
-    if residual:
-        r = Conv2D(filters=filters, kernel_size=1, padding='same', use_bias=False,
-                kernel_initializer='he_uniform', name='decoder_stage{}sk_conv'.format(i))(r)
-        r = BatchNormalization(axis=3, name='decoder_stage{}sk_bn'.format(i))(r)
-        r = Activation('relu', name='decoder_stage{}sk_activation'.format(i))(r)
-        x = Add(name='decoder_stage{}_add'.format(i))([x,r])
-
-    return x
-
 
 def RoadNet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_weights='imagenet',
             encoder_freeze=False, predict_distance=False, predict_contour=False,
-            aspp=False, se=False, residual=False, art=False, 
-            experimental_decoder=False,decoder_exp_setting=None):
+            aspp=False, se=False, residual=False, art=False):
     """
     Encoder-decoder based architecture for road segmentation in aerial images.
 
@@ -243,60 +185,14 @@ def RoadNet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_we
         x = BatchNormalization(axis=3, name='aspp_concat_bn')(x)
         x = Activation('relu', name='aspp_concat_relu')(x)
 
-    # create the decoder blocks sequentially
-    if experimental_decoder:
-        if decoder_exp_setting=="A":
-            decoder_filters = (256, 128, 64, 32, 16)
-            n_blocks = len(decoder_filters)
-            for i in range(n_blocks):
-                x = __decoder_block_A(x,i,decoder_filters,skips,
-                        residual,art,se)
-        elif decoder_exp_setting=="B":
-            decoder_filters = (256, 128, 64, 32, 16)
-            n_blocks = len(decoder_filters)
-            for i in range(n_blocks):
-                x = __decoder_block_B(x,i,decoder_filters,skips,
-                        residual,art,se)
-        elif decoder_exp_setting=="C":
-            decoder_filters = (512, 256, 64, 32, 16)
-            n_blocks = len(decoder_filters)
-            for i in range(n_blocks):
-                x = __decoder_block_A(x,i,decoder_filters,skips,
-                        residual,art,se)
-        elif decoder_exp_setting=="D":
-            decoder_filters = (512, 256, 64, 32, 16)
-            n_blocks = len(decoder_filters)
-            for i in range(n_blocks):
-                x = __decoder_block_B(x,i,decoder_filters,skips,
-                        residual,art,se)
-        else:
-            raise(Exception)
-    else:
-        for i in range(n_blocks):
-            x = __decoder_block_A(x,i,decoder_filters,skips,
-                        residual,art,se)
+    for i in range(n_blocks):
+        x = _decoder_block(x, i, decoder_filters, skips,
+                           residual, art, se)
 
     task1 = Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_mask')(x)
     task1 = Activation('sigmoid', name='final_activation_mask')(task1)
 
-    # prepare for Multitask Learning
-    if predict_contour:
-        task2 = Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_contour')(x)
-        task2 = Activation('sigmoid', name='final_activation_contour')(task2)
-    if predict_distance:
-        task3 = Conv2D(filters=1, kernel_size=(3, 3), padding='same', kernel_initializer='glorot_uniform', name='final_conv_distance')(x)
-        task3 = Activation('linear', name='final_activation_distance')(task3)
-
-    if predict_contour and predict_distance:
-        output = [task1, task2, task3]
-    elif predict_contour:
-        output = [task1, task2]
-    elif predict_distance:
-        output = [task1, task3]
-    else:
-        output = task1
-
-    model = tf.keras.models.Model(backbone.input, output)
+    model = tf.keras.models.Model(backbone.input, task1)
 
     # freeze encoder weights if requested
     if encoder_freeze:
@@ -347,7 +243,7 @@ def CustomUNet(blocks=4, conv_per_block=2, filters=16, activation='relu', dropou
         for i in range(depth):
             if aspp:
                 if bn:
-                    y = BatchNormalization()(y)
+                    x = BatchNormalization()(x)
                 y = Conv2D(filters, 3, activation=activation, dilation_rate=2 ** i, padding='same',
                            kernel_initializer='he_normal')(x)
                 y = Dropout(dropout)(y)
@@ -364,7 +260,7 @@ def CustomUNet(blocks=4, conv_per_block=2, filters=16, activation='relu', dropou
         if aggregate == 'add':
             x = tf.keras.layers.add(dilated)
         elif aggregate == 'concat':
-            x = tf.keras.layers.concatenate(dilated)  # check axis
+            x = tf.keras.layers.concatenate(dilated)
             x = Conv2D(filters, 1, activation=activation, padding='same', kernel_initializer='he_normal')(x)
         else:
             x = last_layer

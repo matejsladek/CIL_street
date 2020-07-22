@@ -30,8 +30,7 @@ def get_parse_image(hard=True):
     return parse_image
 
 
-def get_load_image_train(size=400, normalize=True, h_flip=0.5, v_flip=0.5, rot=0.25, contrast=0.3, brightness=0.1,
-                         predict_contour=False, predict_distance=False):
+def get_load_image_train(size=400, normalize=True, h_flip=0.5, v_flip=0.5, rot=0.25, contrast=0.3, brightness=0.1):
     """
     Returns the method to preprocess training data.
     :param size: size for data resizing
@@ -41,8 +40,6 @@ def get_load_image_train(size=400, normalize=True, h_flip=0.5, v_flip=0.5, rot=0
     :param rot: probability of rotating the image at a precise right angle. Total rotation probability is 3 times as much.
     :param contrast: parameter for random contrast augmentation
     :param brightness: parameter for random brightness augmentation
-    :param predict_contour: prepares the contour of the mask as an additional output
-    :param predict_distance: prepares the distance map of the mask as an additional output
     :return: preprocessing method
     """
     @tf.function
@@ -87,46 +84,18 @@ def get_load_image_train(size=400, normalize=True, h_flip=0.5, v_flip=0.5, rot=0
             input_image = tf.cast(input_image, tf.float32) / 255.0
             input_mask = tf.cast(input_mask, tf.float32) / 255.0
 
-        output = input_mask
-
-        def gradient_py(x):
-            kernel = np.ones((3, 3), np.uint8)
-            return np.expand_dims(cv2.morphologyEx(x, cv2.MORPH_GRADIENT, kernel, iterations=3), axis=-1)
-
-        def distance_py(x):
-            res = ndimage.distance_transform_edt(x).astype(np.float32)
-            return res
-
-        # compute mask contour through morphological gradient
-        input_contour = tf.numpy_function(func=gradient_py, inp=[input_mask], Tout=tf.float32)
-        # compute distance map of the mask
-        input_distance = tf.numpy_function(func=distance_py, inp=[input_mask], Tout=tf.float32)
-
-        # specify output size for tensorflow
         input_mask.set_shape((size, size, 1))
-        input_contour.set_shape((size, size, 1))
-        input_distance.set_shape((size, size, 1))
 
-        # only return correct output(s)
-        if predict_contour and predict_distance:
-            output = (input_mask, input_contour, input_distance)
-        elif predict_contour:
-            output = (input_mask, input_contour)
-        elif predict_distance:
-            output = (input_mask, input_distance)
-
-        return input_image, output
+        return input_image, input_mask
 
     return load_image_train
 
 
-def get_load_image_val(size=400, normalize=True, predict_contour=False, predict_distance=False):
+def get_load_image_val(size=400, normalize=True):
     """
     Returns the method to preprocess validation and test data. Does not need augmentations.
     :param size: size for data resizing
     :param normalize: enables normalization
-    :param predict_contour: prepares the contour of the mask as an additional output
-    :param predict_distance: prepares the distance map of the mask as an additional output
     :return: preprocessing method
     """
     @tf.function
@@ -145,34 +114,8 @@ def get_load_image_val(size=400, normalize=True, predict_contour=False, predict_
             input_image = tf.cast(input_image, tf.float32) / 255.0
             input_mask = tf.cast(input_mask, tf.float32) / 255.0
 
-        output = input_mask
-
-        def gradient_py(x):
-            kernel = np.ones((3, 3), np.uint8)
-            return np.expand_dims(cv2.morphologyEx(x, cv2.MORPH_GRADIENT, kernel, iterations=3), axis=-1)
-
-        def distance_py(x):
-            res = ndimage.distance_transform_edt(x).astype(np.float32)
-            return res
-
-        # compute mask contour through morphological gradient
-        input_contour = tf.numpy_function(func=gradient_py, inp=[input_mask], Tout=tf.float32)
-        # compute distance map of the mask
-        input_distance = tf.numpy_function(func=distance_py, inp=[input_mask], Tout=tf.float32)
-
-        # specify output size for tensorflow
         input_mask.set_shape((size, size, 1))
-        input_contour.set_shape((size, size, 1))
-        input_distance.set_shape((size, size, 1))
 
-        # only return correct output(s)
-        if predict_contour and predict_distance:
-            output = (input_mask, input_contour, input_distance)
-        elif predict_contour:
-            output = (input_mask, input_contour)
-        elif predict_distance:
-            output = (input_mask, input_distance)
-
-        return input_image, output
+        return input_image, input_mask
 
     return load_image_val

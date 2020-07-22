@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.image as mpimg
 import re
 import glob
+import cv2
 
 
 def save_predictions(model, crop, input_path, output_path, postprocessed_output_path, config, postprocess=None):
@@ -26,9 +27,9 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
     :param postprocess: postprocessing function. If None, postprocessing is not applied.
     :return: nothing
     """
-    model_size = config['img_resize'],
-    output_size = config['img_size_test'],
-    normalize = config['normalize'],
+    model_size = config['img_resize']
+    output_size = config['img_size_test']
+    normalize = config['normalize']
 
     test_list = glob.glob(input_path + '/*.png')
 
@@ -49,18 +50,15 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
             out_parts = []
             for img in img_parts:
                 # compute predicted mask
-                resized_img = tf.image.resize(img, (384, 384)).numpy()
+                resized_img = tf.image.resize(img, (model_size, model_size)).numpy()
                 resized_img = np.expand_dims(resized_img, 0)
-                if config['predict_contour'] or config['predict_distance']:
-                    output = model.predict(resized_img)[0][0]
-                else:
-                    output = model.predict(resized_img)[0]
+                output = model.predict(resized_img)[0]
                 if normalize:
                     output = output * 255.0
                 out_parts.append(np.array(tf.keras.preprocessing.image.array_to_img(output).resize((400, 400))))
 
             # aggregate predictions
-            output = np.zeros((608, 608))
+            output = np.zeros((output_size, output_size))
             output[:304, :304] = out_parts[0][:304, :304]
             output[:304, -304:] = out_parts[1][:304, -304:]
             output[-304:, :304] = out_parts[2][-304:, :304]
@@ -72,7 +70,7 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
             image = tf.image.decode_png(image, channels=3)
             image = tf.image.convert_image_dtype(image, tf.uint8)
             # resize image
-            image = tf.image.resize(image, (384, 384))
+            image = tf.image.resize(image, (model_size, model_size))
             # normalize image
             if normalize:
                 image = tf.cast(image, tf.float32) / 255.0
@@ -80,16 +78,13 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
             image = np.expand_dims(image, 0)
 
             # compute predicted mask
-            if config['predict_contour'] or config['predict_distance']:
-                output = model.predict(image)[0][0]
-            else:
-                output = model.predict(image)[0]
+            output = model.predict(image)[0]
 
             if normalize:
                 output = output * 255.0
 
         output = output.astype(np.uint8)
-        output_img = tf.keras.preprocessing.image.array_to_img(output).resize((608, 608))
+        output_img = tf.keras.preprocessing.image.array_to_img(output).resize((output_size, output_size))
 
         # save prediction
         image_name = os.path.basename(image_path)
@@ -98,7 +93,7 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
             continue
         # apply postprocessing and save copy
         postprocessed_output = np.squeeze(postprocess(np.expand_dims(output, 0)), axis=0)
-        postprocessed_output_img = tf.keras.preprocessing.image.array_to_img(postprocessed_output).resize((608, 608))
+        postprocessed_output_img = tf.keras.preprocessing.image.array_to_img(postprocessed_output).resize((output_size, output_size))
         postprocessed_output_img.save(postprocessed_output_path + '/' + image_name)
 
 
@@ -149,3 +144,30 @@ def to_csv(path, submission_filename):
     for image_filename in glob.glob(path + '/*.png'):
         image_filenames.append(image_filename)
     masks_to_submission(submission_filename, *image_filenames)
+
+
+def bag(in_path, out_path, config):
+    """
+    Crawls through prediction folders in order to average them.
+
+    :param in_path: common root to prediction folders
+    :param out_path: path where to save predictions
+    :param config: config dictionary
+    :return: nothing
+    """
+    # dictionary containing images indicized by the last letters in their paths
+    images = {}
+    for img in glob.glob(in_path + '0/*.png'):
+        images[img[len(in_path)+1:]] = []
+
+    # read images
+    for i in range(config['n_ensemble']):
+        for img in glob.glob(in_path + str(i) + '/*.png'):
+            images[img[len(in_path)+1:]].append(cv2.imread(img, 0))
+
+    # average predictions
+    for img in glob.glob(in_path + '0/*.png'):
+        arr = images[img[len(in_path)+1:]]
+        arr = np.array(arr)
+        m = np.mean(arr, axis=0)
+        cv2.imwrite(out_path + '/' + img[len(in_path)+1:], m)
