@@ -53,3 +53,4 @@ The following table explains the single .json attributes.
 | n_ensemble | int | number of networks to train for ensemble method |
 | use_ensemble | boolean | enables ensemble learning |
 | cv_k | int | folds of CV |
+| restore_best_model | boolean | restores the weights of the best model according to validation|

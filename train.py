@@ -90,7 +90,7 @@ def get_dataset(config, autotune):
     # select dataset root according to its name
     if config['dataset'] == 'original':
         all_data_root = "data/original/all/images/"
-    elif config['dataset'] == 'maps1800_all':
+    elif config['dataset'] == 'maps1800':
         all_data_root = "data/maps1800/all/images/"
     else:
         raise Exception('Unrecognised dataset')
@@ -98,8 +98,13 @@ def get_dataset(config, autotune):
     all_data_glob = glob.glob(all_data_root + "*.png")
 
     random.seed(config['seed'])
-    val_data_glob = random.sample(all_data_glob, int(len(all_data_glob)*config['val_split']))
-    training_data_glob = [sample for sample in all_data_glob if sample not in val_data_glob]
+
+    if config["val_split"] == 0:
+        val_data_glob = random.sample(all_data_glob, int(len(all_data_glob)*0.1))
+        training_data_glob = all_data_glob
+    else:
+        val_data_glob = random.sample(all_data_glob, int(len(all_data_glob)*config['val_split']))
+        training_data_glob = [sample for sample in all_data_glob if sample not in val_data_glob]
 
     train_dataset, val_dataset, val_dataset_numpy = get_dataset_from_path(training_data_glob, val_data_glob, config, autotune)
 
@@ -158,12 +163,12 @@ def create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_
             ev = model.evaluate(x=val_dataset_numpy_x, y=val_dataset_numpy_y, verbose=0)
             print('\nValidation metrics: ' + str(ev) + '\n')
             if ev[0] < self.lowest_loss and not config['stop_on_metric']:
-                self.lowest_loss = ev[self.loss_index]
+                self.lowest_loss = ev[0]
                 print('\nNew lowest loss. Saving weights.\n')
                 model.save_weights(config['log_folder'] + '/best_model.h5')
 
             if ev[2] > self.highest_metric and config['stop_on_metric']:
-                self.highest_metric = ev[self.metric_index]
+                self.highest_metric = ev[2]
                 print('New best metric. Saving weights.')
                 model.save_weights(config['log_folder'] + '/best_model.h5')
 
@@ -187,13 +192,13 @@ def create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_
                               validation_data=val_dataset,
                               callbacks=callbacks)
 
-    if config['epochs'] > 0:
+    if config['epochs'] > 0 and config["restore_best_model"]:
         model.load_weights(config['log_folder'] + '/best_model.h5')
 
     return model
 
 
-def validate(model, val_dataset_numpy):
+def validate(model, val_dataset_numpy, config):
     """
     Computes and saves validation scores for the model
 
@@ -221,7 +226,7 @@ def validate(model, val_dataset_numpy):
     out_file.close()
 
 
-def test(model):
+def test(model, config):
     """
     Produces and saves predictions on the test set, both as .png images and .csv files
 
@@ -278,10 +283,10 @@ def run_experiment(config,prep_function):
     logging.info('Finished training')
 
     logging.info('Validating')
-    validate(model, val_dataset_numpy)
+    validate(model, val_dataset_numpy, config)
 
     logging.info('Testing')
-    test(model)
+    test(model, config)
 
     if not(config['save_model']):
         if os.path.exists(os.path.join(config['log_folder'], 'best_model.h5')):

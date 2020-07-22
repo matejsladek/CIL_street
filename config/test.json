@@ -26,6 +26,7 @@
       "augment_loss": false,
       "stop_on_metric": true,
       "custom_callback": true,
+      "restore_best_model": true,
       "save_model": false,
 
       "postprocess": "morphological",
