@@ -21,7 +21,7 @@ from code.metrics import *
 from train import *
 import train_ensemble as train_ensemble
 import code.baseline_regression.segment_aerial_images_to_py as baseline_regression
-import code.baseline_tf_patches.tf_aerial_images as baseline_tf_patches
+import code.baseline_patch_based.patch_based as baseline_patch_based
 
 def get_dataset_cv(config, autotune):
     if config['dataset'] == 'original_all':
@@ -145,7 +145,7 @@ def run_experiment_cv(config,prep_function):
             if config['use_baseline_code1']:
                 baseline_regression.run_experiment(config, prep_function) # run_baseline1(config,prep_function) # baseline 1
             elif config['use_baseline_code2']:
-                baseline_tf_patches.run_experiment(config, prep_function) # run_baseline2(config,prep_function) # baseline 2
+                baseline_patch_based.run_experiment(config, prep_function) # run_baseline2(config,prep_function) # baseline 2
             elif config['use_ensemble']:
                 train_ensemble.run_experiment(config, prep_function) # train_ensemble.py
             else:
