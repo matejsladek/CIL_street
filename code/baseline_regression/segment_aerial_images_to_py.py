@@ -12,6 +12,11 @@ from PIL import Image
 from glob import glob
 import json
 import datetime
+import tensorflow as tf
+import tensorflow_datasets as tfds
+import numpy 
+from sklearn import linear_model
+from code.metrics import *
 
 # Extract patches from input images
 patch_size = 16 # each patch is 16*16 pixels
@@ -77,7 +82,6 @@ def extract_features_2d(img):
 def extract_img_features(filename):
     img = load_image(filename)
     img_patches = img_crop(img, patch_size, patch_size)
-#     X = np.asarray([ extract_features_2d(img_patches[i]) for i in range(len(img_patches))])
     X = np.asarray([ extract_features(img_patches[i]) for i in range(len(img_patches))])
     return X
 
@@ -118,63 +122,47 @@ def make_img_overlay(img, predicted_img):
 
 def run_experiment(config,prep_function):
 
+    # tensorflow setup
+    autotune = tf.data.experimental.AUTOTUNE
+
+    # retrieve datasets
+    train_dataset, val_dataset, val_dataset_numpy,\
+    trainset_size, valset_size, training_data_root, val_data_root = prep_function(config,autotune)
+    val_dataset_numpy_x, val_dataset_numpy_y = val_dataset_numpy
+    print(f"Training dataset contains {trainset_size} images.")
+    print(f"Validation dataset contains {valset_size} images.")
+    steps_per_epoch = max(trainset_size // config['batch_size'], 1)
+
+    # train
+    print('Begin training')
+
     import os
     print(os.getcwd())
 
-    # Loaded a set of images
-    # repo_dir = "../../"
-    repo_dir = "/home/jonathan/CIL-street/"
-    data_dir = repo_dir + "data/"
-    training_dir = data_dir + "original/" + "training/"
-
-    image_dir = training_dir + "images/"
-    files = os.listdir(image_dir)
-    # n = min(20, len(files)) # Load maximum 20 images
-    n = len(files)
-    print("Loading " + str(n) + " images")
-    imgs = [load_image(image_dir + files[i]) for i in range(n)]
-    print(files[0])
-
-    gt_dir = training_dir + "groundtruth/"
-    print("Loading " + str(n) + " images")
-    gt_imgs = [load_image(gt_dir + files[i]) for i in range(n)]
-    print(files[0])
-
-    test_dir = data_dir + "test_images/"
-    test_files = os.listdir(test_dir)
-    n_test = len(test_files)
-    print("Loading " + str(len(test_files)) + " test images")
-    test_imgs = [load_image(test_dir + test_files[i]) for i in range(len(test_files))]
-    print(test_files[0])
-
-    # n = 10 # Only use 10 images for training
-
-    print('Image size = ' + str(imgs[0].shape[0]) + ',' + str(imgs[0].shape[1]))
-
-    # Show first image and its groundtruth image
-    # cimg = concatenate_images(imgs[0], gt_imgs[0])
-    # fig1 = plt.figure(figsize=(10, 10))
-    # plt.imshow(cimg, cmap='Greys_r') # ValueError: could not broadcast input array from shape (400,800,3) into shape (400)
+    # convert training images
+    ds_numpy = tfds.as_numpy(train_dataset) 
+    trainset_size = 10
+    num_images = trainset_size # 1900 # very very slow
+    n = trainset_size
+    imgs = numpy.empty((num_images, 384, 384, 3))
+    gt_imgs = numpy.empty((num_images, 384, 384, 1))
+    for i, el in enumerate(ds_numpy): 
+        if(i >= num_images): # otherwise the iterator runs forever
+            break
+        img, gt = el
+        print(i)
+        imgs[i] = img[0]
+        gt_imgs[i] = gt[0]
 
     img_patches = [img_crop(imgs[i], patch_size, patch_size) for i in range(n)]
     gt_patches = [img_crop(gt_imgs[i], patch_size, patch_size) for i in range(n)]
-
     # Linearize list of patches
     img_patches = np.asarray([img_patches[i][j] for i in range(len(img_patches)) for j in range(len(img_patches[i]))])
     gt_patches =  np.asarray([gt_patches[i][j] for i in range(len(gt_patches)) for j in range(len(gt_patches[i]))])
-
-    test_patches = [img_crop(test_imgs[i], patch_size, patch_size) for i in range(n_test)]
-
-    # Linearize list of patches
-    test_patches = np.asarray([test_patches[i][j] for i in range(len(test_patches)) for j in range(len(test_patches[i]))])
-
-
-    # X = np.asarray([ extract_features_2d(img_patches[i]) for i in range(len(img_patches))])
-    X = np.asarray([ extract_features(img_patches[i]) for i in range(len(img_patches))])
+    X = np.asarray([extract_features(img_patches[i]) for i in range(len(img_patches))])
     Y = np.asarray([value_to_class(np.mean(gt_patches[i])) for i in range(len(gt_patches))])
 
     # Print feature statistics
-
     print('Computed ' + str(X.shape[0]) + ' features')
     print('Feature dimension = ' + str(X.shape[1]))
     print('Number of classes = ' + str(np.max(Y)))
@@ -184,16 +172,7 @@ def run_experiment(config,prep_function):
     print('Class 0: ' + str(len(Y0)) + ' samples')
     print('Class 1: ' + str(len(Y1)) + ' samples')
 
-    # Display a patch that belongs to the foreground class
-    plt.imshow(gt_patches[Y1[3]], cmap='Greys_r')
-
-    # Plot 2d features using groundtruth to color the datapoints
-    plt.scatter(X[:, 0], X[:, 1], c=Y, edgecolors='k', cmap=plt.cm.Paired)
-
     # train a logistic regression classifier
-
-    from sklearn import linear_model
-
     # we create an instance of the classifier and fit the data
     logreg = linear_model.LogisticRegression(C=1e5, class_weight="balanced")
     logreg.fit(X, Y)
@@ -208,57 +187,64 @@ def run_experiment(config,prep_function):
     TPR = len(list(set(Yn) & set(Zn))) / float(len(Z))
     print('True positive rate = ' + str(TPR))
 
-    # Plot features using predictions to color datapoints
-    plt.scatter(X[:, 0], X[:, 1], c=Z, edgecolors='k', cmap=plt.cm.Paired)
+    # compute and save validation scores
+    print('Saving validation scores')
+    out_file = open(config['log_folder'] + "/validation_score.txt", "w")
+    out_file.write("Validation results\n")
+    out_file.write("Results of model.evaluate: \n")
+    val_x = list(val_dataset_numpy_x)
+    val_y = list(val_dataset_numpy_y)
+    n = len(val_x)
+    img_patches = [img_crop(val_x[i], patch_size, patch_size) for i in range(n)]
+    gt_patches = [img_crop(val_y[i], patch_size, patch_size) for i in range(n)]
+    img_patches = np.asarray([img_patches[i][j] for i in range(len(img_patches)) for j in range(len(img_patches[i]))])
+    gt_patches =  np.asarray([gt_patches[i][j] for i in range(len(gt_patches)) for j in range(len(gt_patches[i]))])
+    X_val = np.asarray([extract_features(img_patches[i]) for i in range(len(img_patches))])
+    Y_val = np.asarray([value_to_class(np.mean(gt_patches[i])) for i in range(len(gt_patches))])
+    model_evaluation = logreg.score(X_val, Y_val)
+    out_file.write(str(model_evaluation))
 
+    def kaggle_metric_simple(y_true, y_pred):
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+        return np.sum(y_true == y_pred)/y_true.shape[0]
 
-    # Run prediction on the img_idx-th image
-    img_idx = 11
+    out_file.write("\nKaggle metric on predictions: \n")
+    predictions = logreg.predict(X_val) 
+    print(n)
+    print(len(X_val))
+    print(len(predictions))
+    kaggle_simple = kaggle_metric_simple(Y_val, predictions)
+    out_file.write(str(kaggle_simple))
 
-    Xi = extract_img_features(image_dir + files[img_idx])
-    Zi = logreg.predict(Xi)
-    plt.scatter(Xi[:, 0], Xi[:, 1], c=Zi, edgecolors='k', cmap=plt.cm.Paired)
+    # save predictions on test images
+    test_dir = "data/test_images/"
+    test_files = os.listdir(test_dir)
+    n_test = len(test_files)
+    print("Loading " + str(len(test_files)) + " test images")
+    test_imgs = [load_image(test_dir + test_files[i]) for i in range(len(test_files))]
 
-    # Display prediction as an image
-
-    w = gt_imgs[img_idx].shape[0]
-    h = gt_imgs[img_idx].shape[1]
-    predicted_im = label_to_img(w, h, patch_size, patch_size, Zi)
-    # cimg = concatenate_images(imgs[img_idx], predicted_im)
-    # fig1 = plt.figure(figsize=(10, 10)) # create a figure with the default size 
-    # plt.imshow(cimg, cmap='Greys_r') # ValueError: could not broadcast input array from shape (400,800,3) into shape (400)
-
-    new_img = make_img_overlay(imgs[img_idx], predicted_im)
-
-    plt.imshow(new_img)
-
-    result_dir = repo_dir + "code/baseline_regression/results_six_d/"
-    if not os.path.exists(result_dir):
-        os.makedirs(result_dir)
-
-    w = test_imgs[0].shape[0]
-    h = test_imgs[0].shape[1]
-
-    def parse(prediction):
-        gt_img_3c = np.zeros((w, h, 3), dtype=np.uint8)
-        gt_img8 = img_float_to_uint8(prediction)
-        gt_img_3c[:, :, 0] = gt_img8
-        gt_img_3c[:, :, 1] = gt_img8
-        gt_img_3c[:, :, 2] = gt_img8
-        return gt_img_3c
+    # folder for predictions
+    pred_test_path = os.path.join(config['log_folder'], "pred_test")
+    os.mkdir(pred_test_path)
 
     print(len(test_files))
     for idx, name in enumerate(test_files):
         Xi = extract_img_features(test_dir + test_files[idx])
         Zi = logreg.predict(Xi)
+        w = test_imgs[0].shape[0]
+        h = test_imgs[0].shape[1]
         predicted_im = label_to_img(w, h, patch_size, patch_size, Zi)
-        result_img = parse(predicted_im)
-        Image.fromarray(result_img).save(result_dir + name)
+        gt_img_3c = np.zeros((w, h, 3), dtype=np.uint8)
+        gt_img8 = img_float_to_uint8(predicted_im)
+        gt_img_3c[:, :, 0] = gt_img8
+        gt_img_3c[:, :, 1] = gt_img8
+        gt_img_3c[:, :, 2] = gt_img8
+        result_img = gt_img_3c
+        Image.fromarray(result_img).save(pred_test_path + name)
 
-    return 0
+    print('Finished ' + config['name'])
 
-def prep_experiment():
-    return 0
 
 if __name__ == '__main__':
     # load each config file and run the experiment
@@ -267,4 +253,6 @@ if __name__ == '__main__':
         name = config['name'] + '_' + datetime.datetime.now().strftime("%m%d_%H_%M_%S")
         config['log_folder'] = 'experiments/'+name
         os.makedirs(config['log_folder'])
+        def prep_experiment():
+            return 0
         run_experiment(config, prep_experiment)

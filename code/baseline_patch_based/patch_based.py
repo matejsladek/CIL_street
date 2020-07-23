@@ -27,6 +27,8 @@ from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.layers import Input
 import sklearn.model_selection as sk
+import tensorflow_datasets as tfds
+import numpy
 
 from albumentations import (
     PadIfNeeded,
@@ -296,9 +298,6 @@ def eval_unet(test_imgs, test_imgs_idx, prediction, result_dir, train=False, res
         overlay.save(overlay_dir + "overlay_" + str(img_number) + ".png")
 
 
-import tensorflow_datasets as tfds
-import numpy 
-
 def run_experiment(config,prep_function):
     """
     Trains and evaluates a model before computing and saving test predictions, all according to the config file.
@@ -327,7 +326,7 @@ def run_experiment(config,prep_function):
     patch_size = 16 # each patch is 16*16 pixels
 
     ds_numpy = tfds.as_numpy(train_dataset) 
-    num_images = 10 # 1900 # very very slow
+    num_images = 10 # 1900 # very very slow, trainset_size
     imgs = numpy.empty((num_images, 384, 384, 3))
     gt_imgs = numpy.empty((num_images, 384, 384, 1))
     for i, el in enumerate(ds_numpy): 
