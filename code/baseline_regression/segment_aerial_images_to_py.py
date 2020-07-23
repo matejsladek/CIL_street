@@ -141,8 +141,9 @@ def run_experiment(config,prep_function):
 
     # convert training images
     ds_numpy = tfds.as_numpy(train_dataset) 
-    trainset_size = 10
-    num_images = trainset_size # 1900 # very very slow
+    # for testing, with all images it is very slow
+    # trainset_size = 10
+    num_images = trainset_size
     n = trainset_size
     imgs = numpy.empty((num_images, 384, 384, 3))
     gt_imgs = numpy.empty((num_images, 384, 384, 1))

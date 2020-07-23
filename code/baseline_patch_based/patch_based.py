@@ -233,70 +233,6 @@ def create_res_dirs(result_dir):
         if not os.path.exists(dr):
             os.makedirs(dr)
 
-def eval_f(test_imgs, test_imgs_idx, prediction, result_dir, train=False, result_dir_val=""):
-    result_dir_backup = result_dir
-    for (i, name) in enumerate(test_imgs_idx):
-        if train:
-            if i in indices_test:
-                result_dir = result_dir_val
-            else:
-                result_dir = result_dir_backup
-        w = test_imgs[i].shape[0]
-        h = test_imgs[i].shape[1]
-        patches_per_image = int(w*h/16/16)
-        fr = patches_per_image*i
-        to = patches_per_image*(i+1)
-        labels = prediction[fr:to+1]
-        predicted_img = label_to_img(w, h, patch_size, patch_size, labels)
-        original_img = test_imgs[i]
-        overlay = make_img_overlay(original_img, predicted_img)
-        cimg = concatenate_images(original_img, predicted_img)
-
-        img_number = int(re.search(r"\d+", test_imgs_idx[i]).group(0))
-
-        predicted_img = img_float_to_uint8(predicted_img)
-        cimg = img_float_to_uint8(cimg)
-        prediction_dir = result_dir + "prediction/"
-        concat_dir = result_dir + "concat/"
-        overlay_dir = result_dir + "overlay/"
-        Image.fromarray(predicted_img).save(prediction_dir + "prediction_" + str(img_number) + ".png")
-        Image.fromarray(cimg).save(concat_dir + "concat_" + str(img_number) + ".png")
-        overlay.save(overlay_dir + "overlay_" + str(img_number) + ".png")
-
-
-
-def eval_unet(test_imgs, test_imgs_idx, prediction, result_dir, train=False, result_dir_val=""):
-    result_dir_backup = result_dir
-    for (i, name) in enumerate(test_imgs_idx):
-        if train:
-            if i in indices_test:
-                result_dir = result_dir_val
-            else:
-                result_dir = result_dir_backup
-        w = test_imgs[i].shape[0]
-        h = test_imgs[i].shape[1]
-        patches_per_image = int(w*h/16/16)
-        fr = patches_per_image*i
-        to = patches_per_image*(i+1)
-        labels = prediction[fr:to+1]
-        # print(to)
-#         predicted_img = label_to_img(w, h, patch_size, patch_size, labels)
-        predicted_img = label_to_img_unet(w, h, patch_size, patch_size, labels)
-        original_img = test_imgs[i]
-        overlay = make_img_overlay(original_img, predicted_img)
-        cimg = concatenate_images(original_img, predicted_img)
-
-        img_number = int(re.search(r"\d+", test_imgs_idx[i]).group(0))
-
-        predicted_img = img_float_to_uint8(predicted_img)
-        cimg = img_float_to_uint8(cimg)
-        prediction_dir = result_dir + "prediction/"
-        concat_dir = result_dir + "concat/"
-        overlay_dir = result_dir + "overlay/"
-        Image.fromarray(predicted_img).save(prediction_dir + "prediction_" + str(img_number) + ".png")
-        Image.fromarray(cimg).save(concat_dir + "concat_" + str(img_number) + ".png")
-        overlay.save(overlay_dir + "overlay_" + str(img_number) + ".png")
-
 
 def run_experiment(config,prep_function):
     """
@@ -325,8 +261,12 @@ def run_experiment(config,prep_function):
     # Extract patches from input images
     patch_size = 16 # each patch is 16*16 pixels
 
+    # convert training images
     ds_numpy = tfds.as_numpy(train_dataset) 
-    num_images = 10 # 1900 # very very slow, trainset_size
+    # for testing, with all images it is very slow
+    # trainset_size = 10
+    num_images = trainset_size
+    n = trainset_size
     imgs = numpy.empty((num_images, 384, 384, 3))
     gt_imgs = numpy.empty((num_images, 384, 384, 1))
     for i, el in enumerate(ds_numpy): 
@@ -337,31 +277,17 @@ def run_experiment(config,prep_function):
         imgs[i] = img[0]
         gt_imgs[i] = gt[0]
      
-    n = imgs.shape[0]
     img_patches = [img_crop_64(imgs[i], patch_size, patch_size) for i in range(n)]
-    # unet
     gt_patches = [img_crop_64(gt_imgs[i], patch_size, patch_size) for i in range(n)]
     print("generated patches") # code above is extremely slow
 
     # Linearize list of patches
     img_patches = np.asarray([img_patches[i][j] for i in range(len(img_patches)) for j in range(len(img_patches[i]))])
     gt_patches =  np.asarray([gt_patches[i][j] for i in range(len(gt_patches)) for j in range(len(gt_patches[i]))])
-
-    test_dir = "/home/jonathan/CIL-street/data/test_images/"
-    files = os.listdir(test_dir)
-    print("Loading " + str(len(files)) + " test images")
-    test_imgs = [load_image(test_dir + f) for f in files]
-
-    patch_size = 16
-    test_patches = [img_crop_64(test_imgs[i], patch_size, patch_size) for i in range(len(test_imgs))]
-    test_patches = np.asarray([test_patches[i][j] / 255.0 for i in range(len(test_patches)) for j in range(len(test_patches[i]))])
-
     X = img_patches / 255.0
     Y = tf.where(gt_patches > 0, np.dtype('uint8').type(1), gt_patches)
-    img_patches, gt_patches = None, None
     Y = np.expand_dims(Y, -1)
-    indices = np.arange(X.shape[0])
-    X_train, X_test, y_train, y_test, indices_train, indices_test = sk.train_test_split(X,Y,indices,test_size=0.20, random_state = 42)
+
 
     # taken from a blog post - which blog post?
     # -- Keras Functional API -- #
@@ -371,80 +297,6 @@ def run_experiment(config,prep_function):
 
     input_size = (CROP_SIZE, CROP_SIZE, 3)
 
-    # Contracting Path (encoding)
-    inputs = Input(input_size)
-
-    conv1 = Conv2D(16, 3, activation='elu', padding='same', kernel_initializer='he_normal')(inputs)
-    conv1 = BatchNormalization()(conv1)
-    conv1 = Dropout(0.1)(conv1)
-    conv1 = Conv2D(16, 3, activation='elu', padding='same', kernel_initializer='he_normal')(conv1)
-    conv1 = BatchNormalization()(conv1)
-    pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
-
-    conv2 = Conv2D(32, 3, activation='elu', padding='same', kernel_initializer='he_normal')(pool1)
-    conv2 = BatchNormalization()(conv2)
-    conv2 = Dropout(0.1)(conv2)
-    conv2 = Conv2D(32, 3, activation='elu', padding='same', kernel_initializer='he_normal')(conv2)
-    conv2 = BatchNormalization()(conv2)
-    pool2 = MaxPooling2D(pool_size=(2, 2))(conv2)
-
-    conv3 = Conv2D(64, 3, activation='elu', padding='same', kernel_initializer='he_normal')(pool2)
-    conv3 = BatchNormalization()(conv3)
-    conv3 = Dropout(0.2)(conv3)
-    conv3 = Conv2D(64, 3, activation='elu', padding='same', kernel_initializer='he_normal')(conv3)
-    conv3 = BatchNormalization()(conv3)
-    pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
-
-    conv4 = Conv2D(128, 3, activation='elu', padding='same', kernel_initializer='he_normal')(pool3)
-    conv4 = BatchNormalization()(conv4)
-    conv4 = Dropout(0.2)(conv4)
-    conv4 = Conv2D(128, 3, activation='elu', padding='same', kernel_initializer='he_normal')(conv4)
-    conv4 = BatchNormalization()(conv4)
-    pool4 = MaxPooling2D(pool_size=(2, 2))(conv4)
-
-    conv5 = Conv2D(256, 3, activation='elu', padding='same', kernel_initializer='he_normal')(pool4)
-    conv5 = BatchNormalization()(conv5)
-    conv5 = Dropout(0.3)(conv5)
-    conv5 = Conv2D(256, 3, activation='elu', padding='same', kernel_initializer='he_normal')(conv5)
-    conv5 = BatchNormalization()(conv5)
-
-    # Expansive Path (decoding)
-    up6 = Conv2DTranspose(128, (2, 2), strides=(2, 2), padding='same')(conv5)
-    merge6 = concatenate([up6, conv4])
-    conv6 = Conv2D(128, 3, activation='elu', padding='same', kernel_initializer='he_normal')(merge6)
-    conv6 = BatchNormalization()(conv6)
-    conv6 = Dropout(0.2)(conv6)
-    conv6 = Conv2D(128, 3, activation='elu', padding='same', kernel_initializer='he_normal')(conv6)
-    conv6 = BatchNormalization()(conv6)
-
-    up7 = Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same')(conv6)
-    merge7 = concatenate([up7, conv3])
-    conv7 = Conv2D(64, 3, activation='elu', padding='same', kernel_initializer='he_normal')(merge7)
-    conv7 = BatchNormalization()(conv7)
-    conv7 = Dropout(0.2)(conv7)
-    conv7 = Conv2D(64, 3, activation='elu', padding='same', kernel_initializer='he_normal')(conv7)
-    conv7 = BatchNormalization()(conv7)
-
-    up8 = Conv2DTranspose(32, (2, 2), strides=(2, 2), padding='same')(conv7)
-    merge8 = concatenate([up8, conv2])
-    conv8 = Conv2D(32, 3, activation='elu', padding='same', kernel_initializer='he_normal')(merge8)
-    conv8 = BatchNormalization()(conv8)
-    conv8 = Dropout(0.1)(conv8)
-    conv8 = Conv2D(32, 3, activation='elu', padding='same', kernel_initializer='he_normal')(conv8)
-    conv8 = BatchNormalization()(conv8)
-
-    up9 = Conv2DTranspose(16, (2, 2), strides=(2, 2), padding='same')(conv8)
-    merge9 = concatenate([up9, conv1])
-    conv9 = Conv2D(16, 3, activation='elu', padding='same', kernel_initializer='he_normal')(merge9)
-    conv9 = BatchNormalization()(conv9)
-    conv9 = Dropout(0.1)(conv9)
-    conv9 = Conv2D(16, 3, activation='elu', padding='same', kernel_initializer='he_normal')(conv9)
-    conv9 = BatchNormalization()(conv9)
-
-    conv10 = Conv2D(1, 1, activation='sigmoid')(conv9)
-
-    model = tf.keras.Model(inputs=inputs, outputs=conv10)
-
     model = Sequential([
         Conv2D(16, 3, padding='same', activation='relu', input_shape=(64, 64, 3)),
         MaxPooling2D(),
@@ -462,37 +314,6 @@ def run_experiment(config,prep_function):
         Dense(512, activation='relu'),
         Dropout(0.5),
         Dense(512, activation='relu'),
-        Dropout(0.5),
-        Dense(1)
-    ])
-
-    model = Sequential([
-    #     Conv2D(16, 3, padding='same', activation='relu', input_shape=(patch_size, patch_size, 3)),
-        Conv2D(16, 3, padding='same', activation='relu', input_shape=(64, 64, 3)),
-        MaxPooling2D(),
-        Conv2D(32, 3, padding='same', activation='relu'),
-        MaxPooling2D(),
-        Conv2D(64, 3, padding='same', activation='relu'),
-        MaxPooling2D(),
-        Flatten(),
-    #     Dense(512, activation='relu'),
-    #     Dropout(0.5),
-        Dense(128, activation='relu'),
-        Dropout(0.5),
-        Dense(1)
-        ])
-
-    model = VGG16(weights="imagenet", include_top=False,
-    input_tensor=Input(shape=(64, 64, 3)))
-    model.trainable = False
-    pretrained_model = model
-
-    model = tf.keras.Sequential([
-        pretrained_model,
-        Flatten(),
-        Dense(1024, activation='relu'),
-        Dropout(0.5),
-        Dense(128, activation='relu'),
         Dropout(0.5),
         Dense(1)
     ])
@@ -503,175 +324,77 @@ def run_experiment(config,prep_function):
 
     print(model.summary())
 
-    log_dir="logs/fit"
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-    filepath="weights/weights-improvement-{epoch:02d}-{val_accuracy:.2f}.hdf5"
-    checkpoint = keras.callbacks.ModelCheckpoint(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
-
-    print("training model A")
-    print(X_train.shape)
-    print(y_train.shape)
-    model.fit(X_train,
-            y_train,
-            epochs=100,
+    model.fit(X,
+            Y,
+            epochs=10, # 100 takes too long for testing, and gets killed on my PC
             shuffle=True,
-            validation_data=(X_test, y_test),
             callbacks=[
                     keras.callbacks.EarlyStopping(
                         patience=5,
                         restore_best_weights=True,
                     ),
-                    tensorboard_callback,
-    #                 checkpoint
             ])
 
-    datagen = ImageDataGenerator(
-        # featurewise_center=True,
-        # featurewise_std_normalization=True,
-        shear_range=0.2,
-        zoom_range=0.2,
-        rotation_range=90,
-        width_shift_range=5,
-        height_shift_range=5,
-        horizontal_flip=True,
-        vertical_flip=True)
-    # compute quantities required for featurewise normalization
-    # (std, mean, and principal components if ZCA whitening is applied)
-    datagen.fit(X_train)
 
-    model.fit(datagen.flow(X_train, y_train, batch_size=32),
-            steps_per_epoch=len(X_train) / 32, epochs=100,
-            validation_data=(X_test, y_test),
-            callbacks=[
-                    keras.callbacks.EarlyStopping(
-                        patience=5,
-                        restore_best_weights=True,
-                    ),
-                    tensorboard_callback,
-            ])
+    # compute and save validation scores
+    print('Saving validation scores')
+    out_file = open(config['log_folder'] + "/validation_score.txt", "w")
+    out_file.write("Validation results\n")
+    out_file.write("Results of model.evaluate: \n")
+    val_x = list(val_dataset_numpy_x)
+    val_y = list(val_dataset_numpy_y)
+    n = len(val_x)
 
-    data_gen_args = dict(
-    # rotation_range=180.,
-    # width_shift_range=0.2,
-    # height_shift_range=0.2,
-    # fill_mode="constant",
-    # cval=0,
-    # horizontal_flip=True,
-    # vertical_flip=True
-    )
-    image_datagen = ImageDataGenerator(**data_gen_args)
-    mask_datagen = ImageDataGenerator(**data_gen_args)
+    img_patches = [img_crop_64(val_x[i], patch_size, patch_size) for i in range(n)]
+    gt_patches = [img_crop_64(val_y[i], patch_size, patch_size) for i in range(n)]
+    print("generated patches") # code above is extremely slow
+    img_patches = np.asarray([img_patches[i][j] for i in range(len(img_patches)) for j in range(len(img_patches[i]))])
+    gt_patches =  np.asarray([gt_patches[i][j] for i in range(len(gt_patches)) for j in range(len(gt_patches[i]))])
+    X_val = img_patches / 255.0
+    Y = tf.where(gt_patches > 0, np.dtype('uint8').type(1), gt_patches)
+    Y_val = np.expand_dims(Y, -1)
+    model_evaluation = model.evaluate(X_val, Y_val)
+    out_file.write(str(model_evaluation))
 
-    seed = 1
-    image_generator = image_datagen.flow(X_train, batch_size=8, seed=seed)
-    mask_generator = mask_datagen.flow(numpy.reshape(y_train, (4608, 64, 64, 1)), batch_size=8, seed=seed)
+    def kaggle_metric_simple(y_true, y_pred):
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+        return np.sum(y_true == y_pred)/y_true.shape[0]
 
-    aug = Compose([
-        VerticalFlip(p=0.5),
-        HorizontalFlip(p=0.5),
-        RandomRotate90(p=0.5),
-    ])
+    out_file.write("\nKaggle metric on predictions: \n")
+    predictions = model.predict(X_val) 
+    print(n)
+    print(len(X_val))
+    print(len(predictions))
+    kaggle_simple = kaggle_metric_simple(Y_val, predictions)
+    out_file.write(str(kaggle_simple))
 
-    AUGMENTATIONS_TRAIN = Compose([
-        HorizontalFlip(p=0.5),
-        RandomContrast(limit=0.2, p=0.5),
-        RandomGamma(gamma_limit=(80, 120), p=0.5),
-        RandomBrightness(limit=0.2, p=0.5),
-        # HueSaturationValue(hue_shift_limit=5, sat_shift_limit=20,
-                        #  val_shift_limit=10, p=.9),
-        # CLAHE(p=1.0, clip_limit=2.0),
-        # ShiftScaleRotate(
-            # shift_limit=0.0625, scale_limit=0.1, 
-            # rotate_limit=15, border_mode=cv2.BORDER_REFLECT_101, p=0.8), 
-        # ToFloat(max_value=255)
-    ])
+    # save predictions on test images
+    test_dir = "data/test_images/"
+    test_files = os.listdir(test_dir)
+    n_test = len(test_files)
+    print("Loading " + str(len(test_files)) + " test images")
+    patch_size = 16
+    test_imgs = [load_image(test_dir + test_files[i]) for i in range(len(test_files))]
+    
+    # folder for predictions
+    pred_test_path = os.path.join(config['log_folder'], "pred_test")
+    os.mkdir(pred_test_path)
 
-    data_gen = Better_generator(image_generator, mask_generator, aug)
+    print(len(test_files))
+    for idx, name in enumerate(test_files):
+        test_patches = img_crop_64(test_imgs[i], patch_size, patch_size)
+        test_patches = np.asarray([test_patches[j] / 255.0 for j in range(len(test_patches))])
+        Zi = model.predict(test_patches) 
+        w = test_imgs[0].shape[0]
+        h = test_imgs[0].shape[1]
+        predicted_im = label_to_img(w, h, patch_size, patch_size, Zi)
+        gt_img_3c = np.zeros((w, h, 3), dtype=np.uint8)
+        gt_img8 = img_float_to_uint8(predicted_im)
+        gt_img_3c[:, :, 0] = gt_img8
+        gt_img_3c[:, :, 1] = gt_img8
+        gt_img_3c[:, :, 2] = gt_img8
+        result_img = gt_img_3c
+        Image.fromarray(result_img).save(pred_test_path + name)
 
-    TRAINSET_SIZE = X_train.shape[0]
-    VALSET_SIZE = X_test.shape[0]
-    EPOCHS = 50
-    BATCH_SIZE = 16
-    STEPS_PER_EPOCH = max(TRAINSET_SIZE // BATCH_SIZE, 1)
-    VALIDATION_STEPS = max(VALSET_SIZE // BATCH_SIZE, 1)
-
-    logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(logdir, histogram_freq=1)
-
-    callbacks = [
-        # to collect some useful metrics and visualize them in tensorboard
-        tensorboard_callback,
-        # if no accuracy improvements we can stop the training directly
-        # tf.keras.callbacks.EarlyStopping(patience=10, verbose=1),
-        # to save checkpoints
-        # tf.keras.callbacks.ModelCheckpoint('best_model_unet.h5', verbose=1, save_best_only=True, save_weights_only=True)
-        # tf.keras.callbacks.ModelCheckpoint('best_model_unet64crop.{epoch:03d}-{val_loss:.2f}-{val_accuracy:.2f}.h5', verbose=1, save_best_only=True, save_weights_only=True)
-        # tf.keras.callbacks.ModelCheckpoint('best_model_unet64crop_aug.{epoch:03d}-{val_loss:.2f}-{val_accuracy:.2f}.h5', verbose=1, save_best_only=True, save_weights_only=True)
-        tf.keras.callbacks.ModelCheckpoint('best_model_unet96crop_aug5.{epoch:03d}-{loss:.2f}-{val_loss:.2f}-{accuracy:.2f}-{val_accuracy:.2f}.h5', verbose=1, save_weights_only=True)
-    ]
-
-    # this does not work since train_generator is commented out
-    '''model_history = model.fit(
-        # X_train,
-        # y_train,
-        train_generator,
-        # validation_split=0.1,
-        validation_data=(X_test, y_test),
-        epochs=EPOCHS,
-        batch_size=BATCH_SIZE,
-        steps_per_epoch=STEPS_PER_EPOCH,
-        callbacks=callbacks)
-
-    model.save('my_model.h5')'''
-
-
-    #classification
-    prediction = model.predict(test_patches, verbose=1)
-    print(min(prediction), max(prediction))
-    prediction = (np.sign(prediction)+1)/2
-    print(min(prediction), max(prediction))
-
-    prediction_train = model.predict(img_patches)
-    prediction_train = (np.sign(prediction_train)+1)/2
-
-    test_patches=None
-
-    #unet
-    prediction = model.predict(test_patches, verbose=1)
-    print(prediction.shape)
-
-    #unet
-    prediction_train = model.predict(img_patches, verbose=1)
-    print(prediction_train.shape)
-
-    # # Display prediction as an image
-    img_idx = 13
-    w = gt_imgs[img_idx].shape[0]
-    h = gt_imgs[img_idx].shape[1]
-    patches_per_image = int(w*h/16/16)
-    fr = patches_per_image*img_idx
-    to = patches_per_image*(img_idx+1)
-    labels = prediction_train[fr:to+1]
-    predicted_im = label_to_img(w, h, patch_size, patch_size, labels)
-    cimg = concatenate_images(imgs[img_idx], predicted_im)
-    fig1 = plt.figure(figsize=(10, 10)) # create a figure with the default size 
-    plt.imshow(cimg, cmap='Greys_r')
-
-    result_dir = repo_dir + "code/patch_based/results_unet/"
-    if not os.path.exists(result_dir):
-        os.makedirs(result_dir)
-
-    create_res_dirs(result_dir + "test/")
-    create_res_dirs(result_dir + "train/")
-    create_res_dirs(result_dir + "val/")
-
-
-    eval_f(test_imgs, test_imgs_idx, prediction, result_dir + "test/")
-
-    eval_f(imgs, train_imgs_idx, prediction_train, result_dir + "train/", True, result_dir + "val/")
-
-    prediction=None
-
-    eval_unet(test_imgs, test_imgs_idx, prediction, result_dir + "test/")
-
-    eval_unet(imgs, train_imgs_idx, prediction_train, result_dir + "train/", True, result_dir + "val/")
+    print('Finished ' + config['name'])
