@@ -1,6 +1,6 @@
 {
       "name": "baseline2",
-      "dataset": "maps1800_all",
+      "dataset": "original_all",
       "img_resize": 384,
       "v_flip": 0,
       "h_flip": 0,
