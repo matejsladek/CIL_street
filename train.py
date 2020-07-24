@@ -223,6 +223,7 @@ def validate(model, val_dataset_numpy, config):
     out_file.write(str(tf.keras.backend.mean(postprocessed_predictions == val_dataset_numpy_y_resized).numpy()) + ' ')
     out_file.write(str(f1_m(postprocessed_predictions, val_dataset_numpy_y_resized).numpy())+ ' ')
     out_file.write(str(iou(postprocessed_predictions, val_dataset_numpy_y_resized).numpy())+ ' ')
+    out_file.write('\n')
     out_file.close()
 
 
@@ -372,6 +373,7 @@ def run_experiment_ensemble(config,prep_function):
     out_file.write(str(tf.keras.backend.mean(postprocessed_predictions == val_dataset_numpy_y_resized).numpy()) + '\n')
     out_file.write(str(f1_m(postprocessed_predictions, val_dataset_numpy_y_resized).numpy())+'\n')
     out_file.write(str(iou(postprocessed_predictions, val_dataset_numpy_y_resized).numpy())+'\n')
+    out_file.write('\n')
     out_file.close()
 
     logging.info("Testing")
