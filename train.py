@@ -364,7 +364,7 @@ def run_experiment_ensemble(config,prep_function):
     out_file.write("\nKaggle metric on predictions: \n")
     out_file.write(str(kaggle_metric(predictions, val_dataset_numpy_y_resized).numpy()))
     out_file.write("\nAccuracy, F1 and IoU before post processing: \n")
-    out_file.write(str(tf.keras.backend.mean(predictions == val_dataset_numpy_y_resized).numpy()) + '\n')
+    out_file.write(str(tf.keras.backend.mean((predictions>127) == val_dataset_numpy_y_resized).numpy()) + '\n')
     out_file.write(str(f1_m(predictions, val_dataset_numpy_y_resized).numpy())+'\n')
     out_file.write(str(iou(predictions, val_dataset_numpy_y_resized).numpy())+'\n')
     out_file.write("\nKaggle metric on predictions after post processing: \n")
