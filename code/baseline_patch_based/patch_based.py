@@ -100,7 +100,7 @@ def run_experiment(config,prep_function):
     gt_imgs = numpy.empty((num_images, 384, 384, 1))
     val_imgs = numpy.empty((valset_size, 384, 384, 3))
     val_gt_imgs = numpy.empty((valset_size, 384, 384, 1))
-    for i, el in enumerate(ds_numpy): 
+    for i, el in enumerate(ds_numpy):
         if i >= num_images: # otherwise the iterator runs forever
             break
         img, gt = el
@@ -115,7 +115,7 @@ def run_experiment(config,prep_function):
         print(i)
         val_imgs[i] = val_img[0]
         val_gt_imgs[i] = val_gt[0]
-     
+
     img_patches = [img_crop(imgs[i], PATCH_SIZE, PATCH_SIZE) for i in range(n)]
     gt_patches = [img_crop(gt_imgs[i], PATCH_SIZE, PATCH_SIZE) for i in range(n)]
     val_img_patches = [img_crop(val_imgs[i], PATCH_SIZE, PATCH_SIZE) for i in range(valset_size)]
@@ -139,20 +139,22 @@ def run_experiment(config,prep_function):
         Conv2D(16, 3, padding='same', activation='relu', input_shape=input_size),
         MaxPooling2D(),
         BatchNormalization(),
-        Dropout(0.5),
         Conv2D(32, 3, padding='same', activation='relu'),
+        MaxPooling2D(),
+        BatchNormalization(),
+        Conv2D(64, 3, padding='same', activation='relu'),
         MaxPooling2D(),
         BatchNormalization(),
         Dropout(0.5),
         Flatten(),
-        Dense(128, activation='relu'),
+        Dense(512, activation='relu'),
         Dropout(0.5),
         Dense(1)
     ])
 
     model.compile(optimizer='adam',
-                loss=tf.keras.losses.BinaryCrossentropy(from_logits=False), # from logits=True gives a strange error about shapes
-                metrics=['accuracy'])
+                  loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+                  metrics=['accuracy'])
 
     print(model.summary())
 
@@ -174,31 +176,24 @@ def run_experiment(config,prep_function):
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")
     out_file.write("Validation results\n")
     out_file.write("Results of model.evaluate: \n")
-    val_x = list(val_dataset_numpy_x)
-    val_y = list(val_dataset_numpy_y)
-    n = len(val_x)
 
-    img_patches = [img_crop(val_x[i], PATCH_SIZE, PATCH_SIZE) for i in range(n)]
-    gt_patches = [img_crop(val_y[i], PATCH_SIZE, PATCH_SIZE) for i in range(n)]
-    print("generated patches") # code above is extremely slow
-    img_patches = np.asarray([img_patches[i][j] for i in range(len(img_patches)) for j in range(len(img_patches[i]))])
-    gt_patches =  np.asarray([gt_patches[i][j] for i in range(len(gt_patches)) for j in range(len(gt_patches[i]))])
-    X_val = img_patches / 255.0
-    Y_val = np.asarray([value_to_class(np.mean(gt_patches[i])) for i in range(len(gt_patches))])
     model_evaluation = model.evaluate(X_val, Y_val)
     out_file.write(str(model_evaluation))
 
     def kaggle_metric_simple(y_true, y_pred):
         y_true = np.array(y_true)
         y_pred = np.array(y_pred)
-        return np.sum(y_true == y_pred)/y_true.shape[0]
+        y_pred = np.squeeze(y_pred)
+        y_pred = y_pred.astype(int)
+        return np.sum(y_true == y_pred) / y_true.shape[0]
 
     out_file.write("\nKaggle metric on predictions: \n")
-    predictions = model.predict(X_val) 
+    predictions = model.predict(X_val)
+    predictions2 = (np.sign(predictions) + 1) / 2
     print(n)
     print(len(X_val))
-    print(len(predictions))
-    kaggle_simple = kaggle_metric_simple(Y_val, predictions)
+    print(len(predictions2))
+    kaggle_simple = kaggle_metric_simple(Y_val, predictions2)
     out_file.write(str(kaggle_simple))
 
     # save predictions on test images
@@ -206,7 +201,7 @@ def run_experiment(config,prep_function):
     test_files = os.listdir(test_dir)
     print("Loading " + str(len(test_files)) + " test images")
     test_imgs = [load_image(test_dir + test_files[i]) for i in range(len(test_files))]
-    
+
     # folder for predictions
     pred_test_path = os.path.join(config['log_folder'], "pred_test")
     os.mkdir(pred_test_path)
@@ -215,7 +210,7 @@ def run_experiment(config,prep_function):
     for idx, name in enumerate(test_files):
         test_patches = img_crop(test_imgs[i], PATCH_SIZE, PATCH_SIZE)
         test_patches = np.asarray([test_patches[j] / 255.0 for j in range(len(test_patches))])
-        Zi = model.predict(test_patches) 
+        Zi = model.predict(test_patches)
         w = test_imgs[0].shape[0]
         h = test_imgs[0].shape[1]
         predicted_im = label_to_img(w, h, PATCH_SIZE, PATCH_SIZE, Zi)
