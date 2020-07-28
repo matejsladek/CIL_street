@@ -1,23 +1,17 @@
+# -----------------------------------------------------------
+# Helper script
+# Generate experiment configs organized in a folder from a
+# specified baseline.
+# Requires manual definition of config diffs in functions.
+# Examples below.
+# CIL 2020 - Team NaN
+# -----------------------------------------------------------
 import json
 import os
 import argparse
 import shutil
 
-
 project_dir = os.path.join(*[os.path.dirname(os.path.abspath(__file__)),"..",".."])
-"""
-internal_baseline_path = os.path.join(*[project_dir,"config_archive","internal_baseline.json"])
-internal_baseline = json.loads(open(internal_baseline_path,'r').read())
-
-good_model_path = os.path.join(*[project_dir,"config_archive","good_model_0707.json"])
-good_model = json.loads(open(good_model_path,'r').read())
-"""
-
-best_model_path = os.path.join(*[project_dir,"baseline_configs","best_model_1807.json"])
-#best_model_path = os.path.join(*[project_dir,"baseline_configs","debug_best_model_1807.json"])
-#best_model_path = os.path.join(*[project_dir,"config_archive","best_model_0707.json"])
-best_model = json.loads(open(best_model_path,'r').read())
-
 
 def diff_to_conf(base,exp_diff_list,exp_group_diff):
     config_list = []
@@ -73,6 +67,7 @@ def gen_decoders1907B_configs(base):
     config_list = diff_to_conf(base,exp_diff_list,exp_group_diff)
     return config_list
 
+
 def gen_decoders1907C_configs(base):
 #    exp_group_name = 'decoders1907B_debug'
     exp_group_name = 'decoders1907C_maps1800'
@@ -95,7 +90,6 @@ def gen_decoders1907C_configs(base):
     return config_list
 
 
-#official
 def gen_table1_configs(base):
     exp_group_name = 'exp_group_table1'
     exp_group_diff = {'name':os.path.join(exp_group_name,'exp')}
@@ -105,16 +99,9 @@ def gen_table1_configs(base):
             {'dataset':'maps1800_all',
                 'v_flip':0,'h_flip':0,'rot':0,'contrast':0,'brightness':0},
             {'dataset':'original_all'},
-
-#            {'dataset':'maps1800_all'}
             {'exp_group_baseline':True}
             ]
-#    exp_diff_list = [
-#            {'dataset':'original_all','preprocess':False},
-#            {'dataset':'original_all','preprocess':True},
-#            {'dataset':'maps1800_all','preprocess':False},
-#            {'dataset':'maps1800_all','preprocess':True}
-#            ]
+
     config_list = diff_to_conf(base,exp_diff_list,exp_group_diff)
     return config_list
 
@@ -135,6 +122,7 @@ def gen_table2_configs(base):
             ]
     config_list = diff_to_conf(base,exp_diff_list,exp_group_diff)
     return config_list
+
 
 def gen_opt_lw_configs(base):
     exp_group_name = 'exp_group_opt_lw'
@@ -165,6 +153,7 @@ def gen_opt_lw_configs(base):
 
 
 if __name__=="__main__":
+    #Parse args
     parser = argparse.ArgumentParser()
     parser.add_argument('-g','--exp_group',default=None)
     args = parser.parse_args()
@@ -172,7 +161,14 @@ if __name__=="__main__":
     print(argsdict)
 
 
-    ###
+    #########################################################################
+    ### MANUAL CONFIGURATION of baseline and experiments to generate here ###
+    best_model_path = os.path.join(*[project_dir,"baseline_configs",
+        "best_model_1807.json"])
+    best_model = json.loads(open(best_model_path,'r').read())
+
+    #gen_x_configs() functions take in baselines and generate a list of dicts
+    #corresponding to the json configs to be run in an experiment
     if argsdict['exp_group'] == 'table1':
         config_list = gen_table1_configs(good_model)
     elif argsdict['exp_group'] == 'table2':
@@ -192,16 +188,21 @@ if __name__=="__main__":
         config_list = gen_decoders1907C_configs(best_model)
     elif argsdict['exp_group'] == '1907D':
         config_list = gen_decoders1907D_configs(best_model)
-    ###
+    #########################################################################
 
-    exp_group_config_path = os.path.join(project_dir,'config_'+argsdict['exp_group'])
+
+    #Delete experiment config folder with same name if exists,
+    #and make new folder
+    exp_group_config_path = os.path.join(project_dir,
+            'config_'+argsdict['exp_group'])
     if os.path.exists(exp_group_config_path):
         shutil.rmtree(exp_group_config_path)
     os.makedirs(exp_group_config_path)
 
-    
+    #Dump jsons to config folder
     for i in range(len(config_list)):
-        out_file_path = os.path.join(exp_group_config_path,"exp"+str(i).zfill(3)+".json")
+        out_file_path = os.path.join(exp_group_config_path,
+                "exp"+str(i).zfill(3)+".json")
         out_file = open( out_file_path, "w") 
         json.dump(config_list[i], out_file, indent = 6) 
         out_file.close()

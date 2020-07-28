@@ -8,63 +8,53 @@ from classification_models.tfkeras import Classifiers
 import logging
 
 
-def slice_tensor(x, start, stop, axis):
-    if axis == 3:
-        return x[:, :, :, start:stop]
-    elif axis == 1:
-        return x[:, start:stop, :, :]
-    else:
-        raise ValueError("Slice axis should be in (1, 3), got {}.".format(axis))
+# Custom group convolution for aggregated residual transformation, based on keras.layers.Conv2D
+def GroupConv2D(filters_in,filters_out,kernel_size,strides=(1, 1),groups=32,kernel_initializer='he_uniform',
+        use_bias=True,activation='linear',padding='valid'):
 
-
-def GroupConv2D(filters_in,filters_out,
-                kernel_size,strides=(1, 1),groups=32,
-                kernel_initializer='he_uniform',use_bias=True,
-                activation='linear',padding='valid'):
+    def slice_tensor(x, start, stop, axis):
+        if axis == 3:
+            return x[:, :, :, start:stop]
+        elif axis == 1:
+            return x[:, start:stop, :, :]
+        else:
+            raise ValueError("Slice axis should be in (1, 3), got {}.".format(axis))
 
     def layer(input_tensor):
         inp_ch = filters_in
         out_ch = filters_out
         slice_axis = 3
-        #inp_ch = int(backend.int_shape(input_tensor)[-1] // groups)  # input grouped channels
-        #out_ch = int(filters // groups)  # output grouped channels
 
         blocks = []
         for c in range(groups):
-            slice_arguments = {
-                'start': c * inp_ch,
-                'stop': (c + 1) * inp_ch,
-                'axis': slice_axis,
-            }
+            slice_arguments = {'start': c * inp_ch,'stop': (c + 1) * inp_ch,'axis': slice_axis}
             x = Lambda(slice_tensor, arguments=slice_arguments)(input_tensor)
-            x = Conv2D(out_ch,
-                              kernel_size,
-                              strides=strides,
-                              kernel_initializer=kernel_initializer,
-                              use_bias=use_bias,
-                              activation=activation,
-                              padding=padding)(x)
+            x = Conv2D(out_ch,kernel_size,strides=strides,kernel_initializer=kernel_initializer,
+                    use_bias=use_bias,activation=activation,padding=padding)(x)
             blocks.append(x)
         x = Concatenate(axis=slice_axis)(blocks)
         return x
+
     return layer
 
 
+# Decoder block called by RoadNet with 3x3,3x3 sequential Convs
+# All combinations of res,art,se settings are supported
 def _decoder_block(input_tensor, block_idx, decoder_filters, skips, residual, art, se):
-    #3x3,3x3 with all possible res,art,se
-    #close to best_model
     i = block_idx
     filters = decoder_filters[i]
 
+    # Aggregated residual transformation initialize parameters if requested
     if art:
         cardinality = 32
         width = max(filters*2,cardinality)
 
     r = UpSampling2D(size=2, name='decoder_stage{}_upsample'.format(i))(input_tensor)
-    # skip connection
+    # Get features from encoder and concatenate with current decoder feature map
     if i < len(skips):
         r = Concatenate(axis=3, name='decoder_stage{}_concat'.format(i))([r, skips[i]])
 
+    # Aggregated residual transform: initialize parameters if requested
     if art:
         x = Conv2D(filters=width, kernel_size=3, padding='same', use_bias=False,
             kernel_initializer='he_uniform', name='decoder_stage{}a_conv'.format(i))(r)
@@ -74,9 +64,10 @@ def _decoder_block(input_tensor, block_idx, decoder_filters, skips, residual, ar
     x = BatchNormalization(axis=3, name='decoder_stage{}a_bn'.format(i))(x)
     x = Activation('relu', name='decoder_stage{}a_activation'.format(i))(x)
 
-    # Squeeze and Excitation on the first convolution
+    # Squeeze and Excitation on the first convolution if requested
     if se:
         w = GlobalAveragePooling2D(name='decoder_stage{}a_se_avgpool'.format(i))(x)
+        # Use appropriate n_channels if se and art are used in combination
         if art:
             w = Dense(width // 8, activation='relu', name='decoder_stage{}a_se_dense1'.format(i))(w)
             w = Dense(width, activation='sigmoid', name='decoder_stage{}a_se_dense2'.format(i))(w)
@@ -85,32 +76,34 @@ def _decoder_block(input_tensor, block_idx, decoder_filters, skips, residual, ar
             w = Dense(filters, activation='sigmoid', name='decoder_stage{}a_se_dense2'.format(i))(w)
         x = Multiply(name='decoder_stage{}a_se_mult'.format(i))([x, w])
 
+    # Aggregated residual transform: initialize parameters if requested
     if art:
-        x = ZeroPadding2D(1)(x) #required due to custom GroupConv2D method
+        # Special zero-padding here required due to custom GroupConv2D method
+        x = ZeroPadding2D(1)(x)
         x = GroupConv2D(filters_in=width//cardinality, filters_out=width//cardinality,
                 kernel_size=(3, 3), strides=1, groups=cardinality,
                 kernel_initializer='he_uniform', use_bias=False)(x)
         x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
         x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
-
+        # 1x1 Conv to adjust n_channels
         x = Conv2D(filters=filters, kernel_size=1, padding='same', use_bias=False,
                 kernel_initializer='he_uniform', name='decoder_stage{}c_conv'.format(i))(x)
         x = BatchNormalization(axis=3, name='decoder_stage{}c_bn'.format(i))(x)
         x = Activation('relu', name='decoder_stage{}c_activation'.format(i))(x)
-
     else:
         x = Conv2D(filters=filters, kernel_size=3, padding='same', use_bias=False,
                 kernel_initializer='he_uniform', name='decoder_stage{}b_conv'.format(i))(x)
         x = BatchNormalization(axis=3, name='decoder_stage{}b_bn'.format(i))(x)
         x = Activation('relu', name='decoder_stage{}b_activation'.format(i))(x)
 
-    # Squeeze and Excitation on the second convolution
+    # Squeeze and Excitation on the second convolution if requested
     if se:
         w = GlobalAveragePooling2D(name='decoder_stage{}b_se_avgpool'.format(i))(x)
         w = Dense(filters // 8, activation='relu', name='decoder_stage{}b_se_dense1'.format(i))(w)
         w = Dense(filters, activation='sigmoid', name='decoder_stage{}b_se_dense2'.format(i))(w)
         x = Multiply(name='decoder_stage{}b_se_mult'.format(i))([x, w])
 
+    # Residual mapping if requested
     if residual:
         r = Conv2D(filters=filters, kernel_size=1, padding='same', use_bias=False,
                 kernel_initializer='he_uniform', name='decoder_stage{}sk_conv'.format(i))(r)
@@ -119,7 +112,6 @@ def _decoder_block(input_tensor, block_idx, decoder_filters, skips, residual, ar
         x = Add(name='decoder_stage{}_add'.format(i))([x,r])
 
     return x
-
 
 
 def RoadNet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_weights='imagenet',
@@ -152,7 +144,7 @@ def RoadNet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_we
                         'resnet101': ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0')}
     skip_layers = skip_layers_dict[backbone_name]
 
-    # load backbone network from external library
+    # Load backbone network from external library
     backbone_fn, _ = Classifiers.get(backbone_name)
     backbone = backbone_fn(input_shape=input_shape, weights=encoder_weights, include_top=False)
     skips = ([backbone.get_layer(name=i).output if isinstance(i, str)
@@ -194,7 +186,7 @@ def RoadNet(backbone_name='seresnext50', input_shape=(None, None, 3), encoder_we
 
     model = tf.keras.models.Model(backbone.input, task1)
 
-    # freeze encoder weights if requested
+    # Freeze encoder weights if requested
     if encoder_freeze:
         for layer in backbone.layers:
             if not isinstance(layer, tf.keras.layers.BatchNormalization):
