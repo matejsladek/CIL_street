@@ -73,7 +73,6 @@ def value_to_class(v):
 def kaggle_metric_patches(y_true, y_pred):
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
-    y_pred = np.squeeze(y_pred)
     y_pred = y_pred.astype(int)
     return np.sum(y_true == y_pred) / y_true.shape[0]
 
@@ -181,6 +180,7 @@ def run_experiment(config,prep_function):
 
     out_file.write("Kaggle metric on predictions: \n")
     predictions = (np.sign(model.predict(X_val)) + 1) / 2
+    predictions = np.squeeze(predictions)
     kaggle_simple = kaggle_metric_patches(Y_val, predictions)
     out_file.write(str(kaggle_simple)+'\n')
 
