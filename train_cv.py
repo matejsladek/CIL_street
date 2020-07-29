@@ -21,6 +21,9 @@ from code.loss import *
 from code.metrics import *
 import train as train
 
+import code.baseline_regression.regression as baseline_regression
+import code.baseline_patch_based.patch_based as baseline_patch_based
+
 def get_dataset_cv(config, autotune):
     """
     Loads training and validation globs according to the current fold.
@@ -92,16 +95,19 @@ def run_experiment_cv(config):
     """
 
     config = cv_setup(config)
-
     for i in range(config['cv_k_todo']):
-        logging.info("Running fold no. %d" % i)
-        config['tmp']['cv_log_folder'] = os.path.join(config['tmp']['top_log_folder'], 'split'+str(i))
+        print("train_cv.run_experiment_cv: doing fold no. %d"%i)
+        config['tmp']['cv_log_folder'] = os.path.join(config['tmp']['top_log_folder'],'split'+str(i))
         config['log_folder'] = config['tmp']['cv_log_folder']
-        os.mkdir(config['log_folder'])
-        if config['use_ensemble']:
-            train.run_experiment_ensemble(config, get_dataset_cv)  # imported from train_ensemble.py
+        os.mkdir(config['tmp']['cv_log_folder'])
+        if config['use_baseline_code1']:
+            baseline_regression.run_experiment(config, get_dataset_cv)
+        elif config['use_baseline_code2']:
+            baseline_patch_based.run_experiment(config, get_dataset_cv)
+        elif config['use_ensemble']:
+            train.run_experiment_ensemble(config, get_dataset_cv) 
         else:
-            train.run_experiment(config, get_dataset_cv)  # imported from train.py
+            train.run_experiment(config, get_dataset_cv)
         config['tmp']['cv_k_done'] += 1
 
 

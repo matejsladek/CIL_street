@@ -24,6 +24,8 @@ from code.models import *
 from code.loss import *
 from code.metrics import *
 
+import code.baseline_regression.regression as baseline_regression
+import code.baseline_patch_based.patch_based as baseline_patch_based
 
 def prepare_gpus():
     """
@@ -424,8 +426,11 @@ if __name__ == '__main__':
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         root.addHandler(handler)
-
-        if not config['use_ensemble']:
-            run_experiment(config, get_dataset)
-        else:
+        if config['use_baseline_code1']:
+            baseline_regression.run_experiment(config, get_dataset)
+        elif config['use_baseline_code2']:
+            baseline_tf_patches.run_experiment(config, get_dataset)
+        elif config['use_ensemble']:
             run_experiment_ensemble(config, get_dataset)
+        else:
+            run_experiment(config, get_dataset)
