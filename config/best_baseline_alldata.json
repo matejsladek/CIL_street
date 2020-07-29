@@ -1,0 +1,49 @@
+{
+      "name": "best_baseline_kaggle",
+
+      "dataset": "maps1800",
+      "img_resize": 384,
+      "normalize": true,
+      "v_flip": 0,
+      "h_flip": 0,
+      "rot": 0,
+      "contrast": 0,
+      "brightness": 0,
+      "hard_mask": true,
+
+      "backbone": "resnet101",
+      "pretrained": false,
+      "aspp": false,
+      "residual": false,
+      "art": false,
+      "se": false,
+
+      "batch_size": 4,
+      "epochs": 25,
+      "optimizer": "adam",
+      "learning_rate": 0.0001,
+      "loss": "binary_crossentropy",
+      "augment_loss": false,
+      "stop_on_metric": true,
+      "custom_callback": true,
+      "restore_best_model": false,
+      "save_model": false,
+
+      "postprocess": "none",
+      "n_ensemble": 5,
+      "use_ensemble": true,
+
+      "use_baseline_code1":false,
+      "use_baseline_code2":false,
+
+      "cv_k": 5,
+      "cv_k_todo": 5,
+      "val_split": 0,
+
+      "seed": 42,
+      "img_size": 400,
+      "img_size_test": 608,
+      "n_channels": 3,
+      "n_classes": 2,
+      "buffer_size": 1000
+}
