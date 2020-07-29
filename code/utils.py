@@ -25,7 +25,7 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
     :param postprocessed_output_path: path were to save predictions after postprocessing
     :param config: experiment config for additional parameters
     :param postprocess: postprocessing function. If None, postprocessing is not applied.
-    :return: nothing
+    :return: None
     """
     model_size = config['img_resize']
     output_size = config['img_size_test']
@@ -97,19 +97,12 @@ def save_predictions(model, crop, input_path, output_path, postprocessed_output_
         postprocessed_output_img.save(postprocessed_output_path + '/' + image_name)
 
 
-def unet_freeze_encoder(model):
-    for x in model.layers:
-        if x.name.startswith("decoder"):
-            break
-        x.trainable = False
-
-
 def to_csv(path, submission_filename):
     """
     Adapts the default csv saving scripts to work directly on a folder with predictions.
     :param path: path to predictions
     :param submission_filename: name of the sumbission file
-    :return: nothing
+    :return: None
     """
 
     foreground_threshold = 0.25  # percentage of pixels > 1 required to assign a foreground label to a patch
@@ -153,7 +146,7 @@ def bag(in_path, out_path, config):
     :param in_path: common root to prediction folders
     :param out_path: path where to save predictions
     :param config: config dictionary
-    :return: nothing
+    :return: None
     """
     # dictionary containing images indicized by the last letters in their paths
     images = {}

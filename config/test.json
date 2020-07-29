@@ -19,7 +19,7 @@
       "se": true,
 
       "batch_size": 4,
-      "epochs": 5,
+      "epochs": 25,
       "optimizer": "adam",
       "learning_rate": 0.0001,
       "loss": "binary_crossentropy",
@@ -30,12 +30,15 @@
       "save_model": false,
 
       "postprocess": "morphological",
-      "n_ensemble": 2,
+      "n_ensemble": 5,
       "use_ensemble": false,
 
       "cv_k": 5,
       "cv_k_todo": 5,
       "val_split": 0.1,
+
+      "use_baseline_code1": false,
+      "use_baseline_code2": false,
 
       "seed": 42,
       "img_size": 400,

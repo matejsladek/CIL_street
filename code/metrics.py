@@ -23,8 +23,6 @@ def precision_m(y_true, y_pred):
     """
     true_positives = K.sum(K.clip(K.round(y_true) * K.round(y_pred), 0, 1))
     predicted_positives = K.sum(K.clip(K.round(y_pred), 0, 1))
-    print(predicted_positives)
-    print(predicted_positives.dtype)
     precision = true_positives / (predicted_positives + K.epsilon())
     return precision
 

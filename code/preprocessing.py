@@ -9,6 +9,11 @@ from scipy import ndimage
 
 
 def get_parse_image(hard=True):
+    """
+    Wrapper for image parsing method
+    :param hard: flag for hard discretization of the mask
+    :return: parsing method
+    """
     def parse_image(img_path: str) -> dict:
         """
         Reads the image-mask pair at the specified path. Expects the mask to be in a sister folder to the image.

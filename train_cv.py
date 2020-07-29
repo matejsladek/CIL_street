@@ -24,13 +24,14 @@ import train as train
 import code.baseline_regression.regression as baseline_regression
 import code.baseline_patch_based.patch_based as baseline_patch_based
 
+
 def get_dataset_cv(config, autotune):
     """
     Loads training and validation globs according to the current fold.
 
     :param config: config dictionary
     :param autotune: tensorflow autotune
-    :return: nothing
+    :return: None
     """
     if config['dataset'] == 'original':
         all_data_root = "data/original/all/images/"
@@ -45,8 +46,8 @@ def get_dataset_cv(config, autotune):
     k_done = config['tmp']['cv_k_done']
     all_idxs = config['tmp']['cv_shuffled_idxs']
     N_fold = int(len(all_idxs)/config['cv_k'])
-    train_idxs = np.concatenate([all_idxs[ :N_fold*k_done ], all_idxs[ N_fold*(k_done+1): ]])
-    val_idxs = all_idxs[ N_fold*k_done:N_fold*(k_done+1) ]
+    train_idxs = np.concatenate([all_idxs[:N_fold*k_done], all_idxs[N_fold*(k_done+1):]])
+    val_idxs = all_idxs[N_fold*k_done:N_fold*(k_done+1)]
 
     training_data_glob = list(np.array(all_data_glob)[train_idxs])
     val_data_glob = list(np.array(all_data_glob)[val_idxs])
@@ -59,9 +60,9 @@ def get_dataset_cv(config, autotune):
 
 def cv_setup(config):
     """
-    Prepares CV by shuffling indices and creating a temporary entry
+    Prepares CV by shuffling data indices and creating a temporary entry
     :param config: config dictionary
-    :return: nothing
+    :return: None
     """
 
     if config['dataset'] == 'original':
@@ -88,19 +89,20 @@ def cv_setup(config):
 
 def run_experiment_cv(config):
     """
-    Prepares and runs a cv experiment by calling external methods
+    Prepares and runs a cross validated experiment
 
     :param config: config dictionary
-    :return: nothing
+    :return: None
     """
-
     config = cv_setup(config)
     for i in range(config['cv_k_todo']):
         print("train_cv.run_experiment_cv: doing fold no. %d"%i)
         config['tmp']['cv_log_folder'] = os.path.join(config['tmp']['top_log_folder'],'split'+str(i))
         config['log_folder'] = config['tmp']['cv_log_folder']
         os.mkdir(config['tmp']['cv_log_folder'])
-        if config['use_baseline_code1']:
+        if config['use_baseline_code1'] and config['use_baseline_code2']:
+            raise Exception('Ambiguous config file.')
+        elif config['use_baseline_code1']:
             baseline_regression.run_experiment(config, get_dataset_cv)
         elif config['use_baseline_code2']:
             baseline_patch_based.run_experiment(config, get_dataset_cv)
@@ -113,7 +115,7 @@ def run_experiment_cv(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c','--config_dir',default='config')
+    parser.add_argument('-c', '--config_dir', default='config')
     args = parser.parse_args()
     argsdict = vars(args)
 

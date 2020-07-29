@@ -27,10 +27,11 @@ from code.metrics import *
 import code.baseline_regression.regression as baseline_regression
 import code.baseline_patch_based.patch_based as baseline_patch_based
 
+
 def prepare_gpus():
     """
     Enable memory growth and detect GPU
-    :return: nothing
+    :return: None
     """
     print(f"Tensorflow ver. {tf.__version__}")
     gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -46,7 +47,7 @@ def prepare_gpus():
 
 def get_dataset_from_path(training_data_glob, val_data_glob, config, autotune):
     """
-    Retrieve tf.Datasets from globs of images paths, applies preprocessing.
+    Retrieves tf.Datasets from globs of images paths, applies preprocessing.
     :param training_data_glob: glob of training images
     :param val_data_glob: glob of validation images
     :param config: configuration dictionary
@@ -142,7 +143,7 @@ def get_model(config):
 
 def create_and_train_model(train_dataset, val_dataset, val_dataset_numpy, steps_per_epoch, config):
     """
-    Creates the model and trains it. Weights are restored from best epoch according to validation kaggle_metric.
+    Creates the model and trains it. Weights are restored from best epoch.
     :param train_dataset: training dataset
     :param val_dataset: validation dataset
     :param val_dataset_numpy: numpy version of validation dataset for simple and consistent evaluation
@@ -212,7 +213,7 @@ def validate(model, val_dataset_numpy, config):
     val_dataset_numpy_y_resized = tf.image.resize(val_dataset_numpy_y, [config['img_size'], config['img_size']])
     postprocess = get_postprocess(config['postprocess'])
     predictions = tf.image.resize(model.predict(val_dataset_numpy_x), [config['img_size'], config['img_size']])
-    postprocessed_predictions = np.where(postprocess(predictions.numpy()*255)>127, 1, 0).astype(np.float32)
+    postprocessed_predictions = np.where(postprocess(predictions.numpy()*255) > 127, 1, 0).astype(np.float32)
 
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")
     out_file.write("Results of model.evaluate: \n")
@@ -223,8 +224,8 @@ def validate(model, val_dataset_numpy, config):
     out_file.write(str(kaggle_metric(postprocessed_predictions, val_dataset_numpy_y_resized).numpy()))
     out_file.write("\nAccuracy, F1 and IoU after post processing: \n")
     out_file.write(str(tf.keras.backend.mean(postprocessed_predictions == val_dataset_numpy_y_resized).numpy()) + ' ')
-    out_file.write(str(f1_m(postprocessed_predictions, val_dataset_numpy_y_resized).numpy())+ ' ')
-    out_file.write(str(iou(postprocessed_predictions, val_dataset_numpy_y_resized).numpy())+ ' ')
+    out_file.write(str(f1_m(postprocessed_predictions, val_dataset_numpy_y_resized).numpy()) + ' ')
+    out_file.write(str(iou(postprocessed_predictions, val_dataset_numpy_y_resized).numpy()) + ' ')
     out_file.write('\n')
     out_file.close()
 
@@ -257,7 +258,7 @@ def test(model, config):
 
     # save predictions as csv files for simple submission
     to_csv(pred_test_path, os.path.join(config['log_folder'], 'pred_submission.csv'))
-    to_csv(postprocess_test_path, os.path.join(config['log_folder'],'postprocess_submission.csv'))
+    to_csv(postprocess_test_path, os.path.join(config['log_folder'], 'postprocess_submission.csv'))
 
 
 def run_experiment(config,prep_function):
@@ -358,17 +359,18 @@ def run_experiment_ensemble(config,prep_function):
 
     val_preds = tf.stack(val_preds)
     predictions = tf.reduce_mean(val_preds, axis=0)
+    rounded_pred = tf.math.round(predictions)
     logging.info("Validating")
     postprocess = get_postprocess(config['postprocess'])
     postprocessed_predictions = np.where(postprocess(predictions.numpy()*255)>127, 1, 0).astype(np.float32)
 
     out_file = open(config['log_folder'] + "/validation_score.txt", "w")
     out_file.write("\nKaggle metric on predictions: \n")
-    out_file.write(str(kaggle_metric(predictions, val_dataset_numpy_y_resized).numpy()))
+    out_file.write(str(kaggle_metric(rounded_pred, val_dataset_numpy_y_resized).numpy()))
     out_file.write("\nAccuracy, F1 and IoU before post processing: \n")
-    out_file.write(str(tf.keras.backend.mean((predictions>127) == val_dataset_numpy_y_resized).numpy()) + '\n')
-    out_file.write(str(f1_m(predictions, val_dataset_numpy_y_resized).numpy())+'\n')
-    out_file.write(str(iou(predictions, val_dataset_numpy_y_resized).numpy())+'\n')
+    out_file.write(str(tf.keras.backend.mean(rounded_pred == val_dataset_numpy_y_resized).numpy()) + '\n')
+    out_file.write(str(f1_m(rounded_pred, val_dataset_numpy_y_resized).numpy())+'\n')
+    out_file.write(str(iou(rounded_pred, val_dataset_numpy_y_resized).numpy())+'\n')
     out_file.write("\nKaggle metric on predictions after post processing: \n")
     out_file.write(str(kaggle_metric(postprocessed_predictions, val_dataset_numpy_y_resized).numpy()))
     out_file.write("\nAccuracy, F1 and IoU after post processing: \n")
@@ -426,7 +428,9 @@ if __name__ == '__main__':
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         root.addHandler(handler)
-        if config['use_baseline_code1']:
+        if config['use_baseline_code1'] and config['use_baseline_code2']:
+            raise Exception('Ambiguous config file.')
+        elif config['use_baseline_code1']:
             baseline_regression.run_experiment(config, get_dataset)
         elif config['use_baseline_code2']:
             baseline_patch_based.run_experiment(config, get_dataset)

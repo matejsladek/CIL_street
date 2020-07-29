@@ -19,7 +19,7 @@ To reproduce crossvalidation scores you can use:
 ```python train_cv.py --config_dir config```
 
 ## Additional info
-Single experiments can be entirely configured via .json files. Please refer to `config/best_model.json` for an example.
+Single experiments can be entirely configured via .json files. Please refer to `config/test.json` for an example.
 The following table explains the single .json attributes.
 
 | Parameters    | Type          | Usage         |
@@ -27,7 +27,7 @@ The following table explains the single .json attributes.
 | name | string | output folder name |
 | dataset | string | name of the dataset to use |
 | img_resize | int | size of the model's input and output, must be a multiple of 16 |
-| normalize | bool | normalizes the model's input |
+| normalize | boolean | normalizes the model's input |
 | v_flip | float | probability to vertically flip a single input image |
 | h_flip | float | probability to horizontally flip a single input image |
 | rot | float | probability to rotate a single input image at aright angle |
@@ -48,9 +48,14 @@ The following table explains the single .json attributes.
 | augment_loss | boolean | adds a quadratic loss term that pushes predictions to 0 or 1 |
 | stop_on_metric | boolean | uses patch-wise accuracy instead of loss for model saving |
 | custom_callback | boolean | uses a custom callback instead of tf.keras.callbacks.ModelCheckpoint |
+| restore_best_model | boolean | restores the weight from the epoch with highest validation metric/loss |
 | save_model | boolean | enables model saving |
 | postprocess | string | name of postprocessing technique to apply |
 | n_ensemble | int | number of networks to train for ensemble method |
 | use_ensemble | boolean | enables ensemble learning |
 | cv_k | int | folds of CV |
-| restore_best_model | boolean | restores the weights of the best model according to validation|
+| cv_k_todo | int | folds of CV |
+| val_split | float | fraction of data to use or validation |
+| use_baseline_code1 | boolean | replaces our model with the first baseline |
+| use_baseline_code2 | boolean | replaces our model with the second baseline |
+| seed | int | random seed for the scripts |

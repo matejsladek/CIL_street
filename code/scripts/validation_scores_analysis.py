@@ -11,7 +11,7 @@ import pandas as pd
 project_dir = os.path.join(*[os.path.dirname(os.path.abspath(__file__)),"..",".."])
 
 
-def gen_df_row_data(vs_str,mode)
+def gen_df_row_data(vs_str,mode):
     res_str = vs_str.split('\n')[2]
     char_to_remove = "[] "
     for c in char_to_remove:
