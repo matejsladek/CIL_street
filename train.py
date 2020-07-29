@@ -429,7 +429,7 @@ if __name__ == '__main__':
         if config['use_baseline_code1']:
             baseline_regression.run_experiment(config, get_dataset)
         elif config['use_baseline_code2']:
-            baseline_tf_patches.run_experiment(config, get_dataset)
+            baseline_patch_based.run_experiment(config, get_dataset)
         elif config['use_ensemble']:
             run_experiment_ensemble(config, get_dataset)
         else:

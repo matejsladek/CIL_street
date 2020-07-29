@@ -15,12 +15,10 @@ import datetime
 import logging
 import tensorflow as tf
 import tensorflow_datasets as tfds
-import numpy 
 from sklearn import linear_model
 from code.metrics import *
 
-# Extract patches from input images
-patch_size = 16 # each patch is 16*16 pixels
+PATCH_SIZE = 16 # each patch is 16*16 pixels
 
 # Helper functions
 
@@ -61,7 +59,7 @@ def extract_features(img):
 # Extract features for a given image
 def extract_img_features(filename):
     img = load_image(filename)
-    img_patches = img_crop(img, patch_size, patch_size)
+    img_patches = img_crop(img, PATCH_SIZE, PATCH_SIZE)
     X = np.asarray([ extract_features(img_patches[i]) for i in range(len(img_patches))])
     return X
 
@@ -113,8 +111,8 @@ def run_experiment(config,prep_function):
     # convert training images
     ds_numpy = tfds.as_numpy(train_dataset) 
     # with all images it is very slow
-    imgs = numpy.empty((trainset_size, 384, 384, 3))
-    gt_imgs = numpy.empty((trainset_size, 384, 384, 1))
+    imgs = np.empty((trainset_size, 384, 384, 3))
+    gt_imgs = np.empty((trainset_size, 384, 384, 1))
     for i, el in enumerate(ds_numpy): 
         if(i >= trainset_size): # otherwise the iterator runs forever
             break
@@ -122,8 +120,8 @@ def run_experiment(config,prep_function):
         imgs[i] = img[0]
         gt_imgs[i] = gt[0]
 
-    img_patches = [img_crop(imgs[i], patch_size, patch_size) for i in range(trainset_size)]
-    gt_patches = [img_crop(gt_imgs[i], patch_size, patch_size) for i in range(trainset_size)]
+    img_patches = [img_crop(imgs[i], PATCH_SIZE, PATCH_SIZE) for i in range(trainset_size)]
+    gt_patches = [img_crop(gt_imgs[i], PATCH_SIZE, PATCH_SIZE) for i in range(trainset_size)]
 
     # Linearize list of patches
     img_patches = np.asarray([img_patches[i][j] for i in range(len(img_patches)) for j in range(len(img_patches[i]))])
@@ -165,8 +163,8 @@ def run_experiment(config,prep_function):
     val_x = list(val_dataset_numpy_x)
     val_y = list(val_dataset_numpy_y)
     val_size = len(val_x)
-    img_patches = [img_crop(val_x[i], patch_size, patch_size) for i in range(val_size)]
-    gt_patches = [img_crop(val_y[i], patch_size, patch_size) for i in range(val_size)]
+    img_patches = [img_crop(val_x[i], PATCH_SIZE, PATCH_SIZE) for i in range(val_size)]
+    gt_patches = [img_crop(val_y[i], PATCH_SIZE, PATCH_SIZE) for i in range(val_size)]
     img_patches = [img_patches[i][j] for i in range(len(img_patches)) for j in range(len(img_patches[i]))]
     gt_patches =  [gt_patches[i][j] for i in range(len(gt_patches)) for j in range(len(gt_patches[i]))]
     X_val = np.asarray([extract_features(img_patches[i]) for i in range(len(img_patches))])
@@ -211,7 +209,7 @@ def run_experiment(config,prep_function):
         Zi = logreg.predict(Xi)
         w = test_imgs[0].shape[0]
         h = test_imgs[0].shape[1]
-        predicted_im = label_to_img(w, h, patch_size, patch_size, Zi)
+        predicted_im = label_to_img(w, h, PATCH_SIZE, PATCH_SIZE, Zi)
         gt_img_3c = np.zeros((w, h, 3), dtype=np.uint8)
         gt_img8 = img_float_to_uint8(predicted_im)
         gt_img_3c[:, :, 0] = gt_img8
