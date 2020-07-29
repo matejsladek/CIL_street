@@ -18,6 +18,10 @@ To reproduce crossvalidation scores you can use:
 
 ```python train_cv.py --config_dir config```
 
+You can get the means and intervals with:
+
+```python code/scripts/validation_score_analysis.py```
+
 ## Additional info
 Single experiments can be entirely configured via .json files. Please refer to `config/test.json` for an example.
 The following table explains the single .json attributes.
