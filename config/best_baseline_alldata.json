@@ -31,7 +31,7 @@
 
       "postprocess": "none",
       "n_ensemble": 5,
-      "use_ensemble": true,
+      "use_ensemble": false,
 
       "use_baseline_code1":false,
       "use_baseline_code2":false,
