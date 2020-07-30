@@ -40,8 +40,9 @@ def iou(y_true, y_pred):
     """
     Computes IoU on the predictions
     """
+    y_true = tf.convert_to_tensor(y_true)
     true_positives = K.sum(K.clip(K.round(y_true) * K.round(y_pred), 0, 1))
-    predicted_positives = K.sum(K.clip(y_pred, 0, 1))
+    predicted_positives = K.sum(K.clip(K.round(y_pred), 0, 1))
     false_positives = predicted_positives - true_positives
     false_negatives = K.sum(K.clip(K.round(y_true) * K.round(1 - y_pred), 0, 1))
     return true_positives / (true_positives + false_positives + false_negatives + K.epsilon())
