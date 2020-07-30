@@ -1,17 +1,21 @@
+# -----------------------------------------------------------
+# Cross-validation script. Requires a config folder to be
+# passed as a parameter. For each .json file in that folder
+# a cross-validation run is performed.
+# CIL 2020 - Team NaN
+# -----------------------------------------------------------
+
 import glob
 import numpy as np
-import tensorflow as tf
 import datetime
 import os
 import os.path
-from tensorflow.keras.layers import *
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.keras.optimizers import Adam
 import random
 import json
 import shutil
 import argparse
 import logging
+import tensorflow as tf
 
 from code.preprocessing import *
 from code.postprocessing import *

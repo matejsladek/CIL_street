@@ -1,5 +1,6 @@
 # -----------------------------------------------------------
-# Implementation of models. The second one is kept as a reference, while the first one is our best model.
+# Implementation of models. The second one is kept as a
+# reference, while the first one is our best model.
 # CIL 2020 - Team NaN
 # -----------------------------------------------------------
 import tensorflow as tf

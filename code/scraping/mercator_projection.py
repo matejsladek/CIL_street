@@ -1,5 +1,9 @@
-# source https://stackoverflow.com/questions/12507274/how-to-get-bounds-of-a-google-static-map?lq=1
-# added getCenters
+# -----------------------------------------------------------
+# Helper functions for gathering additional data.
+# Source: https://stackoverflow.com/questions/12507274/how-to-get-bounds-of-a-google-static-map?lq=1
+# CIL 2020 - Team NaN
+# -----------------------------------------------------------
+
 from __future__ import division
 import math
 MERCATOR_RANGE = 256

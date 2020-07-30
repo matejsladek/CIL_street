@@ -1,7 +1,8 @@
-# -*- coding: utf-8 -*-
-"""regression.ipynb (previously segment_aerial_images.ipynb)
-converted to a .py file and made nicer
-"""
+# -----------------------------------------------------------
+# Baseline #2: Patch-based Logistic Regression, adapted from
+# the notebook provided in the context of the course.
+# CIL 2020 - Team NaN
+# -----------------------------------------------------------
 
 from sklearn import linear_model
 import matplotlib.image as mpimg

@@ -1,6 +1,8 @@
-# -*- coding: utf-8 -*-
-"""main.ipynb"""
-
+# -----------------------------------------------------------
+# Baseline #2: Patch-based CNN, adapted from the notebook
+# provided in the context aof the course.
+# CIL 2020 - Team NaN
+# -----------------------------------------------------------
 # Commented out IPython magic to ensure Python compatibility.
 # helper functions from https://github.com/dalab/lecture_cil_public/blob/master/exercises/2019/ex11_old/segment_aerial_images.ipynb
 # needs batch size 1

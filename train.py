@@ -1,8 +1,10 @@
 # -----------------------------------------------------------
-# Main training script. Requires a config folder to be passed as a parameter. For each .json file in that folder
-# an experiment is run.
+# Main training script. Requires a config folder to be passed
+# as a parameter. For each .json file in that folder an
+# experiment is run.
 # CIL 2020 - Team NaN
 # -----------------------------------------------------------
+
 import json
 import argparse
 import sys
@@ -13,8 +15,7 @@ import shutil
 import numpy as np
 import random
 import tensorflow as tf
-from tensorflow.keras.layers import *
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
+from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger
 from tensorflow.keras.optimizers import Adam
 
 from code.preprocessing import *

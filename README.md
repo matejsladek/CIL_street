@@ -4,26 +4,34 @@
 This codebase implements the final methods used by our team for the project, although we experimented with different approaches.
 The final model is a DCNN with an encoder-decoder structure. More information can be found on the report.
 
+## How to get the data
+Training datasets should be added to `data` folder. In particular the 100 training images provided for the project should
+be added to `data/original/all/images` while their masks should be in `data/original/all/groundtruth`. Additionally,
+test samples should be added to `data/test_images`. We can provide our additional dataset if requested. Without it,
+the models can only be trained on the original dataset (`dataset = 'original'`).
+
 ## Execution
 The main results can be reproduced by running the training script `train.py`. This script loads
 .json configurations from a folder and reproduces one experiment for each configuration. Each experiment
 consists of training, validation and testing. It outputs the model's predictions on a test set
 both as .png images and in .csv format. This, together with additional information such as Tensorboard
-logs and validation scores is saved in a folder in ./experiments. To run this with the default
-config, simply use:
+logs and validation scores is saved in a folder in ./experiments. The folder also contains .csv files 
+for easy submission to Kaggle. To run this with the default config, simply use:
 
 ```python train.py --config_dir config```
+
+Note that this config trains a single network, while for reproducing our best submission you should set `use_ensemble`
+to true in the config file. We provide more configs in the folder `config_archive`.
 
 To reproduce crossvalidation scores you can use:
 
 ```python train_cv.py --config_dir config```
 
-You can get the means and intervals with:
-
-```python code/scripts/validation_score_analysis.py```
+Other useful scripts are contained in the scripts folder and can be used for analyzing validation scores and
+generating config files.
 
 ## Additional info
-Single experiments can be entirely configured via .json files. Please refer to `config/test.json` for an example.
+Single experiments can be entirely configured via .json files. Please refer to `config/best_model.json` for an example.
 The following table explains the single .json attributes.
 
 | Parameters    | Type          | Usage         |
