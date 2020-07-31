@@ -7,16 +7,16 @@ The final model is a DCNN with an encoder-decoder structure. More information ca
 ## How to get the data
 Training datasets should be added to `data` folder. In particular the 100 training images provided for the project should
 be added to `data/original/all/images` while their masks should be in `data/original/all/groundtruth`. Additionally,
-test samples should be added to `data/test_images`. We can provide our additional dataset if requested. Without it,
-the models can only be trained on the original dataset (`dataset = 'original'`).
+test samples should be added to `data/test_images`. Our additional dataset can be downloaded from [Polybox](https://polybox.ethz.ch/index.php/s/z3iF1BbfHO3aZV9). It should be 
+placed in `data/maps1800/all/`. Without it, the models can only be trained on the original
+dataset (`dataset = 'original'`).
 
 ## Execution
 The main results can be reproduced by running the training script `train.py`. This script loads
 .json configurations from a folder and reproduces one experiment for each configuration. Each experiment
 consists of training, validation and testing. It outputs the model's predictions on a test set
 both as .png images and in .csv format. This, together with additional information such as Tensorboard
-logs and validation scores is saved in a folder in ./experiments. The folder also contains .csv files 
-for easy submission to Kaggle. To run this with the default config, simply use:
+logs and validation scores is saved in a folder in ./experiments. To run this with the default config, simply use:
 
 ```python train.py --config_dir config```
 
@@ -68,6 +68,6 @@ The following table explains the single .json attributes.
 | cv_k | int | folds of CV |
 | cv_k_todo | int | folds of CV |
 | val_split | float | fraction of data to use or validation |
-| use_baseline_code1 | boolean | replaces our model with the first baseline |
-| use_baseline_code2 | boolean | replaces our model with the second baseline |
+| use_baseline_code1 | boolean | replaces our model with logistic regression baseline |
+| use_baseline_code2 | boolean | replaces our model with the second baseline (not reported on)|
 | seed | int | random seed for the scripts |
