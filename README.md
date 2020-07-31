@@ -8,7 +8,7 @@ The final model is a DCNN with an encoder-decoder structure. More information ca
 Training datasets should be added to `data` folder. In particular the 100 training images provided for the project should
 be added to `data/original/all/images` while their masks should be in `data/original/all/groundtruth`. Additionally,
 test samples should be added to `data/test_images`. Our additional dataset can be downloaded from Polybox. It should be 
-merged with the original and placed in `data/maps1800/all/`. Without it, the models can only be trained on the original
+placed in `data/maps1800/all/`. Without it, the models can only be trained on the original
 dataset (`dataset = 'original'`).
 
 ## Execution
