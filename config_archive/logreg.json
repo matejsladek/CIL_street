@@ -1,5 +1,5 @@
 {
-      "name": "best_model_cv",
+      "name": "logreg",
 
       "dataset": "maps1800",
       "img_resize": 384,
@@ -30,10 +30,10 @@
       "save_model": false,
 
       "postprocess": "morphological",
-      "n_ensemble": 5,
+      "n_ensemble": 10,
       "use_ensemble": false,
 
-      "use_baseline_code1":false,
+      "use_baseline_code1":true,
       "use_baseline_code2":false,
 
       "cv_k": 5,

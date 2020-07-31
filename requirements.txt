@@ -18,3 +18,4 @@ tensorboard-plugin-wit==1.7.0
 tensorflow==2.2.0
 tensorflow-estimator==2.2.0
 tensorflow-datasets==3.2.1
+keras-applications==1.0.8

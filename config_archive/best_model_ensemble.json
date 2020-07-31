@@ -1,5 +1,5 @@
 {
-      "name": "best_baseline_kaggle",
+      "name": "best_model_ensemble",
 
       "dataset": "maps1800",
       "img_resize": 384,
@@ -11,12 +11,12 @@
       "brightness": 0,
       "hard_mask": true,
 
-      "backbone": "resnet101",
-      "pretrained": false,
+      "backbone": "seresnext101",
+      "pretrained": true,
       "aspp": false,
       "residual": false,
       "art": false,
-      "se": false,
+      "se": true,
 
       "batch_size": 4,
       "epochs": 25,
@@ -26,12 +26,12 @@
       "augment_loss": false,
       "stop_on_metric": true,
       "custom_callback": true,
-      "restore_best_model": false,
+      "restore_best_model": true,
       "save_model": false,
 
-      "postprocess": "none",
-      "n_ensemble": 5,
-      "use_ensemble": false,
+      "postprocess": "morphological",
+      "n_ensemble": 10,
+      "use_ensemble": true,
 
       "use_baseline_code1":false,
       "use_baseline_code2":false,

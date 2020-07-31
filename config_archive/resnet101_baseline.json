@@ -1,7 +1,7 @@
 {
-      "name": "test",
+      "name": "resnet101_baseline",
 
-      "dataset": "original",
+      "dataset": "maps1800",
       "img_resize": 384,
       "normalize": true,
       "v_flip": 0,
@@ -11,12 +11,12 @@
       "brightness": 0,
       "hard_mask": true,
 
-      "backbone": "seresnext101",
-      "pretrained": true,
+      "backbone": "resnet101",
+      "pretrained": false,
       "aspp": false,
       "residual": false,
       "art": false,
-      "se": true,
+      "se": false,
 
       "batch_size": 4,
       "epochs": 25,
@@ -26,19 +26,19 @@
       "augment_loss": false,
       "stop_on_metric": true,
       "custom_callback": true,
-      "restore_best_model": true,
+      "restore_best_model": false,
       "save_model": false,
 
-      "postprocess": "morphological",
+      "postprocess": "none",
       "n_ensemble": 5,
       "use_ensemble": false,
 
+      "use_baseline_code1":false,
+      "use_baseline_code2":false,
+
       "cv_k": 5,
       "cv_k_todo": 5,
-      "val_split": 0.1,
-
-      "use_baseline_code1": false,
-      "use_baseline_code2": false,
+      "val_split": 0,
 
       "seed": 42,
       "img_size": 400,
