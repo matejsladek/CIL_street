@@ -214,9 +214,11 @@ def run_experiment(config,prep_function):
     os.mkdir(pred_test_path)
 
     for idx, name in enumerate(test_files):
-        test_patches = img_crop(test_imgs[i], PATCH_SIZE, PATCH_SIZE)
+        test_patches = img_crop(test_imgs[idx], PATCH_SIZE, PATCH_SIZE)
         test_patches = np.asarray([test_patches[j] / 255.0 for j in range(len(test_patches))])
         Zi = model.predict(test_patches)
+        Zi = (np.sign(Zi) + 1) / 2
+        Zi = np.squeeze(Zi)
         w = test_imgs[0].shape[0]
         h = test_imgs[0].shape[1]
         predicted_im = label_to_img(w, h, PATCH_SIZE, PATCH_SIZE, Zi)
